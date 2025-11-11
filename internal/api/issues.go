@@ -20,6 +20,7 @@ type Issue struct {
 	Assignee  string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	ClosedAt  *time.Time
 	Comments  int
 }
 
@@ -85,6 +86,11 @@ func ListIssues(ctx context.Context, client *ghapi.RESTClient, repo string, limi
 			if updated, ok := it["updated_at"].(string); ok {
 				if tm, err := time.Parse(time.RFC3339, updated); err == nil {
 					iss.UpdatedAt = tm
+				}
+			}
+			if closed, ok := it["closed_at"].(string); ok && closed != "" {
+				if tm, err := time.Parse(time.RFC3339, closed); err == nil {
+					iss.ClosedAt = &tm
 				}
 			}
 			// labels

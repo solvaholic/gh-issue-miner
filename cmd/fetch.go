@@ -3,7 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -34,16 +36,22 @@ var fetchCmd = &cobra.Command{
 			return err
 		}
 
+		// use tabwriter for aligned columns
+		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+		fmt.Fprintln(w, "#\tstate\ttitle\tlabels\tassignee\tcreated\tupdated\tcomments")
 		for _, it := range issues {
 			labels := strings.Join(it.Labels, ",")
 			assignee := "unassigned"
 			if it.Assignee != "" {
 				assignee = it.Assignee
 			}
-			fmt.Printf("#%d  %s  \"%s\"  %s  %s  %s  %s  %d\n",
+			title := it.Title
+			// Quote title to keep spaces visible
+			title = fmt.Sprintf("\"%s\"", title)
+			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n",
 				it.Number,
 				it.State,
-				it.Title,
+				title,
 				labels,
 				assignee,
 				it.CreatedAt.Format("2006-01-02"),
@@ -51,6 +59,7 @@ var fetchCmd = &cobra.Command{
 				it.Comments,
 			)
 		}
+		w.Flush()
 
 		return nil
 	},
