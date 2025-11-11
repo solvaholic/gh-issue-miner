@@ -1,28 +1,31 @@
 # issue-miner
-`issue-miner` is a tool for deriving insights from data about GitHub issues.
+`issue-miner` is a GitHub CLI (`gh`) extension written in Go for analyzing GitHub issues, providing insights through metrics and relationship graphs.
 
 Example usage:
 
 ```shell
-# Summarize open bug reports
-issue-miner summarize --repo octocat/Hello-World --labels bug
+# Output stats about 100 issues in a specified repository
+gh issue-miner pulse --repo octocat/Hello-World --limit 100
 
-# Graph links into and out of open issues
-issue-miner graph --repo octocat/Hello-World
-
-# Graph links into and out of a specific issue
-issue-miner graph https://github.com/octocat/Hello-World/issues/42
+# Fetch 20 issues from a repository
+gh issue-miner fetch --repo octocat/Hello-World --limit 20
 ```
 
 ## Subcommands
 `issue-miner` has several subcommands to perform different tasks. Here they are, along with the filters they imply:
 
-Subcommand | Filters      | Description
----        | ---          | ---
-pulse      | --state open | Show pulse metrics about issues
-graph      | --state open | Graph issues and links in/out
+Subcommand | Default Filters | Description
+---        | ---             | ---
+fetch      | --limit 100     | List issues and their basic details
+pulse      | --limit 100     | Show pulse metrics about issues
 
 <!--
+PHASE 2:
+graph      | --limit 100     | Graph issues and links in/out
+-->
+
+<!--
+FUTURE?:
 summarize | --state open | Summarize issues in a repository
 -->
 
@@ -31,32 +34,46 @@ summarize | --state open | Summarize issues in a repository
 
 Filter   | Default | Description
 ---      | ---     | ---
-<url>    |         | URL of an issue to analyze (all other filters will be ignored)
---repo   | $(git remote get-url --push origin) | NWO or URL of the repository to analyze
---labels | all     | Issues with these labels (comma-separated)
---state  | open    | Issues with this state or status (open, closed, all)
+--repo   | `origin` remote | NWO or URL of the repository to analyze
 --limit  | 100     | Maximum number of issues to return
 
 <!--
+PHASE 2:
+<url>    |         | URL of an issue to analyze (all other filters will be ignored)
+-->
+
+<!--
+PHASE 3:
+--labels | all     | Issues with these labels (comma-separated)
+--state  | open    | Issues with this state or status (open, closed, all)
+--assignee  | all | Issues assigned to this user
+--author    | all | Issues created by this author
 --created   | all | Issues created within this time frame<br />(e.g., `30days`, `90-60days`, `2025-02-01`)
 --updated   | all | Issues updated within this time frame<br />(e.g., `30days`, `90-60days`, `2025-02-01`)
 --closed    | all | Issues closed within this time frame<br />(e.g., `30days`, `90-60days`, `2025-02-01`)
---assignee  | all | Issues assigned to this user
---author    | all | Issues created by this author
+-->
+
+<!--
+FUTURE?:
 --commenter | all | Issues commented on by this user
 --mention   | all | Issues mentioning this user
 --milestone | all | Issues in this milestone
 -->
+
+<!--
+PHASE 3:
 
 ## Output Options
 `issue-miner` supports various output options to suit your needs. Here are the available options:
 
 Option      | Default    | Description
 ---         | ---        | ---
+--sort      | created_at | Sort issues by this field (e.g., `created_at`, `updated_at`)
+--order     | desc       | Sort order (asc or desc)
 --output    | stdout     | Output file (default is stdout)
---sort      | created_at | Sort issues by this field (e.g., `created_at`, `updated_at`, `comments`)
---direction | desc       | Sort direction (asc or desc)
+-->
 
 <!--
+FUTURE?:
 --center | issues | Center groupings on issues, users, or labels
 -->

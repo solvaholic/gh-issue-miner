@@ -38,7 +38,7 @@
 **Purpose**: Provide intuitive command-line interface
 
 **Requirements**:
-- Subcommands: `pulse`, `graph`
+- Subcommands: `fetch`, `pulse`, `graph` (Phase 1 will include `fetch` and `pulse`)
 - Global options for filtering and output
 - Help text for all commands and options
 - Input validation with clear error messages
@@ -72,9 +72,10 @@
 **Purpose**: Allow users to narrow down issues for analysis
 
 **Required Filters** (v1.0):
-- `--repo <NWO>`: Repository in `owner/repo` format (default: current repo from git)
-- `--state <state>`: Issue state (open, closed, all) - default: open
-- `--limit <n>`: Maximum number of issues (default: 100)
+- `--repo <NWO>`: Repository in `owner/repo` format (default: current repo from git). Commands operate on the current repository when `--repo` is not provided.
+- `--limit <n>`: Maximum number of issues (default: 100).
+
+Note: For the Phase 1 release, only `--repo` and `--limit` are supported. `--state` and other filters are planned for later phases.
 
 **Enhanced Filters** (Phase 3):
 - `--label <labels>`: Comma-separated list of labels
@@ -93,15 +94,36 @@
 - Validate filter combinations before querying
 - Support time range parsing: relative (e.g., `7d`, `30d`) and absolute (ISO 8601 dates or ranges)
 
-### 5. Pulse Command
+### 5. Fetch Command
+**Purpose**: Fetch list of issues and their basic details
+
+**Command**: `gh issue-miner fetch [flags]`
+
+**Behavior**:
+- Retrieve issues from the target repository (current repo or `--repo`) subject to supported filters.
+- Phase 1: supports `--repo` and `--limit` only; other filters added in later phases.
+- Supports pagination; stops after `--limit` issues are collected.
+- Outputs a concise list with: issue number, state, title, labels, assignee, created_at, updated_at, comments_count.
+
+**Output Format** (Phase 1):
+```
+#123  open  "Issue title"  bug,help wanted  alice  2025-01-02  2025-01-10  4
+```
+
+**Technical Approach**:
+- Use `cli/go-gh` GraphQL queries to list issues and fields.
+- Request minimal fields for Phase 1 for efficiency.
+- Parse labels and assignee information for output.
+
+### 6. Pulse Command
 **Purpose**: Show metrics about repository issues, respecting all provided filters
 
 **Command**: `gh issue-miner pulse [flags]`
 
 **Behavior**:
-- Apply ALL provided filters to the issue set before calculating metrics
-- Useful for focused analysis (e.g., pulse of `bug` labels, or issues by specific author, or issues closed in last 30 days)
-- Default shows pulse for all open issues (respects `--state open` default)
+- Calculate metrics for issues in the target repository (current repo or `--repo`) subject to supported filters.
+- Useful for focused analysis when enhanced filters are available in later phases.
+- In Phase 1 the `pulse` command accepts only `--repo` and `--limit`; additional filters (labels, author, time ranges) are added in later phases.
 
 **Output Metrics**:
 - Applied filters summary (if any non-default filters used)
@@ -170,13 +192,13 @@ Authors:
 ```
 
 **Technical Approach**:
-- Phase 1 (MVP): Fetch all issues matching basic filters (--repo, --state, --limit)
+- Phase 1 (MVP): Fetch all issues matching basic filters (--repo, --limit)
 - Phase 3 (Enhanced): Apply all provided filters to GraphQL query
 - Calculate all metrics from the filtered issue set
 - Show filter summary when non-default filters are applied
 - Format output using `text/tabwriter` for alignment
 
-### 6. Graph Command
+### 7. Graph Command
 **Purpose**: Visualize issue relationships and cross-references
 
 **Command**: `gh issue-miner graph [flags] [issue-url]`
@@ -214,7 +236,7 @@ Authors:
 - Recursive traversal for single-issue mode
 - Format as tree structure with box-drawing characters
 
-### 7. Output System
+### 8. Output System (Phase 3)
 **Purpose**: Provide flexible output options
 
 **Requirements**:
@@ -280,23 +302,24 @@ gh-issue-miner/
 ## Implementation Phases
 
 ### Phase 1: Foundation (MVP)
-**Goal**: GitHub CLI extension with basic pulse command
+**Goal**: GitHub CLI extension with `fetch` and `pulse` commands
 
 - [ ] Initialize Go module and project structure
 - [ ] Set up `cobra` CLI framework
 - [ ] Integrate `go-gh` for GitHub API
-- [ ] Implement repository detection (from current dir or flag)
-- [ ] Implement basic issue fetching (--repo, --state, --limit filters only)
-- [ ] Implement pulse command with core metrics (unfiltered analysis)
+- [ ] Implement repository detection (current repo or `--repo` flag)
+- [ ] Implement `fetch` command to list issues (supports `--repo` and `--limit`)
+- [ ] Implement `pulse` command to compute core metrics (supports `--repo` and `--limit`)
 - [ ] Test installation as `gh` extension
 
-**Deliverable**: Users can run `gh issue-miner pulse` to see basic metrics for open issues in a repository
+**Deliverable**: Users can run `gh issue-miner fetch` and `gh issue-miner pulse` against the current repository or a repository specified with `--repo`, with `--limit` available to bound results.
 
 **Estimated effort**: 2-3 days
 
 ### Phase 2: Graph Command
 **Goal**: Add issue relationship visualization
 
+- [ ] Implement `<url>` filter
 - [ ] Implement reference parser (regex + timeline API)
 - [ ] Build graph data structure
 - [ ] Implement text-based graph rendering with box-drawing
@@ -309,10 +332,12 @@ gh-issue-miner/
 **Goal**: Add comprehensive filtering and filter-aware pulse metrics
 
 - [ ] Implement time range parser (relative and absolute dates)
-- [ ] Implement `--label` filter
 - [ ] Implement `--assignee` filter
 - [ ] Implement `--author` filter
+- [ ] Implement `--label` filter
+- [ ] Implement `--state` filter
 - [ ] Implement `--created` filter (time range)
+- [ ] Implement `--updated` filter (time range)
 - [ ] Implement `--closed` filter (time range)
 - [ ] Update pulse command to respect all filters
 - [ ] Add filter summary to pulse output
@@ -348,13 +373,26 @@ gh extension install solvaholic/gh-issue-miner
 ```
 
 ### Basic Usage
+#### Phase 1 (Pulse and Fetch Commands)
 ```bash
-# Show pulse metrics for current repository (open issues)
+# Show pulse metrics for current repository
 gh issue-miner pulse
 
-# Show pulse for specific repository
-gh issue-miner pulse --repo cli/cli
+# Show 50 issues from a specific repository
+gh issue-miner fetch --repo cli/cli --limit 50
+```
 
+#### Phase 2 (Graph Command)
+```bash
+# Graph issue relationships
+gh issue-miner graph --repo cli/cli --limit 50
+
+# Graph specific issue
+gh issue-miner graph https://github.com/cli/cli/issues/1234
+```
+
+#### Phase 3 (Enhanced Filters)
+```bash
 # Show pulse for bugs opened in last 30 days
 gh issue-miner pulse --label bug --created 30d
 
@@ -364,14 +402,8 @@ gh issue-miner pulse --author octocat --state all
 # Show pulse for closed issues in last 90 days assigned to alice
 gh issue-miner pulse --assignee alice --state closed --closed 90d
 
-# Graph issue relationships
-gh issue-miner graph --repo cli/cli --limit 50
-
-# Graph specific issue
-gh issue-miner graph https://github.com/cli/cli/issues/1234
-
 # Graph bugs with relationships
-gh issue-miner graph --label bug --limit 100
+gh issue-miner graph --label bug --closed 30d
 ```
 
 ### Authentication
@@ -383,10 +415,9 @@ gh auth login
 ## Repository Detection
 
 When `--repo` is not specified:
-1. Check `GH_REPO` environment variable
-2. Check current directory for git repository
-3. Extract repository from `origin` remote URL
-4. Fall back to error if not detectable
+1. Extract repository from `origin` remote URL
+2. Check `GH_REPO` environment variable
+3. Fall back to error if not detectable
 
 ## Error Handling
 
