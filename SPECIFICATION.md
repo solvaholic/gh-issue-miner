@@ -364,8 +364,8 @@ gh-issue-miner/
 - [x] Implement `--created` filter (time range)
 - [x] Implement `--updated` filter (time range)
 - [x] Implement `--closed` filter (time range)
-- [ ] Update pulse command to respect all filters
-- [ ] Add filter summary to pulse output
+- [x] Update pulse command to respect all filters
+- [x] Add filter summary to pulse output
 - [ ] Add `--sort` and `--order` options
 - [ ] Add JSON output format
 - [ ] Add DOT output format for graphs

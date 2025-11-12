@@ -51,6 +51,15 @@ var pulseCmd = &cobra.Command{
 				if cmd.Flags().Changed("include-prs") {
 					conflict = append(conflict, "--include-prs")
 				}
+				if cmd.Flags().Changed("created") {
+					conflict = append(conflict, "--created")
+				}
+				if cmd.Flags().Changed("updated") {
+					conflict = append(conflict, "--updated")
+				}
+				if cmd.Flags().Changed("closed") {
+					conflict = append(conflict, "--closed")
+				}
 				if cmd.Flags().Changed("repo") {
 					conflict = append(conflict, "--repo")
 				}
@@ -99,6 +108,33 @@ var pulseCmd = &cobra.Command{
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 		fmt.Fprintf(w, "Repository:\t%s\n\n", repoStr)
+
+		// Print filter summary when non-default filters were provided
+		var active []string
+		if cmd.Flags().Changed("label") && pulseLabel != "" {
+			active = append(active, fmt.Sprintf("label=%s", pulseLabel))
+		}
+		if cmd.Flags().Changed("state") && pulseState != "" {
+			active = append(active, fmt.Sprintf("state=%s", pulseState))
+		}
+		if cmd.Flags().Changed("include-prs") && pulseIncludePRs {
+			active = append(active, "include-prs=true")
+		}
+		if cmd.Flags().Changed("created") && pulseCreated != "" {
+			active = append(active, fmt.Sprintf("created=%s", pulseCreated))
+		}
+		if cmd.Flags().Changed("updated") && pulseUpdated != "" {
+			active = append(active, fmt.Sprintf("updated=%s", pulseUpdated))
+		}
+		if cmd.Flags().Changed("closed") && pulseClosed != "" {
+			active = append(active, fmt.Sprintf("closed=%s", pulseClosed))
+		}
+		if cmd.Flags().Changed("limit") && pulseLimit != 100 {
+			active = append(active, fmt.Sprintf("limit=%d", pulseLimit))
+		}
+		if len(active) > 0 {
+			fmt.Fprintf(w, "Filters:\t%s\n\n", strings.Join(active, ", "))
+		}
 
 		twW, _, err := term.GetSize(int(os.Stdout.Fd()))
 		if err != nil || twW <= 0 {
