@@ -14,6 +14,7 @@ type Issue struct {
 	Number    int
 	State     string
 	Title     string
+	Body      string
 	Labels    []string
 	Assignee  string
 	CreatedAt time.Time
@@ -72,6 +73,9 @@ func ListIssues(ctx context.Context, client RESTClient, repo string, limit int) 
 			}
 			if t, ok := it["title"].(string); ok {
 				iss.Title = t
+			}
+			if b, ok := it["body"].(string); ok {
+				iss.Body = b
 			}
 			if comments, ok := it["comments"].(float64); ok {
 				iss.Comments = int(comments)
@@ -147,6 +151,9 @@ func GetIssue(ctx context.Context, client RESTClient, repo string, number int) (
 	}
 	if t, ok := m["title"].(string); ok {
 		iss.Title = t
+	}
+	if b, ok := m["body"].(string); ok {
+		iss.Body = b
 	}
 	if comments, ok := m["comments"].(float64); ok {
 		iss.Comments = int(comments)

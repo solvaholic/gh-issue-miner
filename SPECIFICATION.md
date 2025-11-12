@@ -208,10 +208,19 @@ Authors:
 - Otherwise: Graph all issues matching filters
 
 **Relationships to Track**:
-- Issue-to-issue references (via `#123` mentions in body/comments)
-- Cross-repository references (via `owner/repo#123` mentions)
-- "Closes/Fixes" relationships
-- Timeline references (via GitHub's timeline API)
+- Issue-to-issue references (detected from issue URLs or textual references such as `#123` or `owner/repo#123` in bodies/comments)
+- Cross-repository references (explicit `owner/repo#123` or full issue URLs that point to other repositories)
+- "Closes/Fixes" relationships (explicit close keywords or timeline events where one issue closes another)
+- Timeline-originated references (events and timeline items obtained from the GitHub timeline API)
+- User-to-issue interactions:
+  - Comments (user commented on an issue or PR)
+  - Reviews (user added a review to a pull request)
+  - Label modifications (user added or removed labels)
+  - State changes (user opened, merged, closed, or reopened an issue or PR)
+  - Project board events (user added or removed an issue from a project/column)
+  - Other timeline actions (milestone changes, lock/unlock, transfers)
+- Record actor, timestamp, and context/source (timeline event vs parsed body/comment) for each relationship
+- Represent edges with metadata: action type, actor (username), timestamp, and source (timeline, webhook, or parsed text)
 
 **Output Format**:
 - Text-based graph (ASCII art) to stdout by default
@@ -318,20 +327,27 @@ gh-issue-miner/
 **Goal**: Add issue relationship visualization
 
 - [x] Implement `<url>` filter
-- [ ] Implement reference parser (regex + timeline API)
-- [ ] Build graph data structure
-- [ ] Implement text-based graph rendering with box-drawing
-- [ ] Add graph command to CLI
-- [ ] Handle cross-repository references
+- [x] Implement reference parser (regex) that detects full issue URLs, `owner/repo#123`, and short `#123` references
+- [x] Populate `Issue.Body` from API responses so textual parsing can run over issue bodies
+- [x] Add `ListIssueComments` helper to fetch issue comments for parsing
+- [x] Add `graph` command (MVP): parse bodies, build adjacency map, print simple adjacency list
+ - [x] Graph parses issue bodies and comments (single-issue and list modes)
+- [ ] Add timeline API support and parse timeline items to discover timeline-originated references and explicit actions
+- [ ] Extract and attach full edge metadata: actor (username), timestamp, action type (e.g., "referenced", "closed"), and source (`timeline` vs `parsed` vs `comment`)
+- [ ] Comment-level attribution: capture comment id, author, and timestamp for parsed references and include that context on edges
+- [ ] Resolve ambiguous short references (`#123`) when possible and surface unresolved/ambiguous short refs as warnings
+- [ ] Implement recursive graph resolution with `--depth` and cycle detection; limit cross-repo expansion to avoid explosion
+- [ ] Implement rate-limit and performance strategies: batching, exponential backoff, and limits for large repositories
 
 ### Phase 3: Enhanced Filtering & Pulse
 **Goal**: Add comprehensive filtering and filter-aware pulse metrics
 
-- [ ] Implement time range parser (relative and absolute dates)
 - [ ] Implement `--assignee` filter
 - [ ] Implement `--author` filter
+- [ ] Implement `--include-prs` filter
 - [ ] Implement `--label` filter
 - [ ] Implement `--state` filter
+- [ ] Implement time range parser (relative and absolute dates)
 - [ ] Implement `--created` filter (time range)
 - [ ] Implement `--updated` filter (time range)
 - [ ] Implement `--closed` filter (time range)
