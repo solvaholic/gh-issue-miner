@@ -46,7 +46,10 @@ Filter   | Default | Description
 ---      | ---     | ---
 <url>    |         | URL of an issue to analyze (all other filters will be ignored)
 --repo   | `origin` remote | NWO or URL of the repository to analyze
---limit  | 100     | Maximum number of issues to return
+--limit  | 100     | Maximum number of issues to select
+--include-prs | true | Select pull requests as well as issues
+--labels | all     | Select issues with these labels (comma-separated)
+--state  | open    | Select issues with this state or status (open, closed)
 
 These filters apply only to the `graph` command:
 
@@ -58,8 +61,6 @@ Filter       | Default  | Description
 
 <!--
 PHASE 3:
---labels | all     | Issues with these labels (comma-separated)
---state  | open    | Issues with this state or status (open, closed, all)
 --assignee  | all | Issues assigned to this user
 --author    | all | Issues created by this author
 --created   | all | Issues created within this time frame<br />(e.g., `30days`, `90-60days`, `2025-02-01`)

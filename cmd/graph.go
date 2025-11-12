@@ -20,6 +20,9 @@ var graphLimit int
 var graphDepth int
 var graphCrossRepo bool
 var graphMaxNodes int
+var graphIncludePRs bool
+var graphLabel string
+var graphState string
 
 var graphCmd = &cobra.Command{
 	Use:   "graph",
@@ -33,6 +36,7 @@ var graphCmd = &cobra.Command{
 
 		var issues []api.Issue
 		repo := graphRepo
+		var fallbackPrefixes []string
 
 		// If given a positional issue URL, fetch that issue and its comments
 		if len(args) > 0 {
@@ -69,10 +73,59 @@ var graphCmd = &cobra.Command{
 				}
 				repo = r
 			}
-			issues, err = api.ListIssues(ctx, client, repo, graphLimit)
+			// Prepare labels for server-side filtering: expand trailing-* patterns
+			var labelsForAPI []string
+			var fallbackPrefixes []string
+			if graphLabel != "" {
+				needLabels := false
+				for _, p := range strings.Split(graphLabel, ",") {
+					if strings.HasSuffix(strings.TrimSpace(p), "*") {
+						needLabels = true
+						break
+					}
+				}
+
+				var repoLabels []string
+				if needLabels {
+					repoLabels, _ = api.ListRepoLabels(ctx, client, repo)
+				}
+
+				for _, p := range strings.Split(graphLabel, ",") {
+					p = strings.TrimSpace(p)
+					if p == "" {
+						continue
+					}
+					if strings.HasSuffix(p, "*") {
+						prefix := strings.TrimSuffix(p, "*")
+						found := false
+						for _, rl := range repoLabels {
+							if strings.HasPrefix(rl, prefix) {
+								labelsForAPI = append(labelsForAPI, rl)
+								found = true
+							}
+						}
+						if !found {
+							fallbackPrefixes = append(fallbackPrefixes, p)
+						}
+						continue
+					}
+					labelsForAPI = append(labelsForAPI, p)
+				}
+			}
+
+			issues, err = api.ListIssues(ctx, client, repo, graphLimit, graphState, labelsForAPI, graphIncludePRs)
 			if err != nil {
 				return err
 			}
+		}
+
+		// apply filters only to the initial issue selection
+		// But if we expanded wildcard patterns above, apply fallback client-side filtering
+		fallbackRaw := strings.Join(fallbackPrefixes, ",")
+		if fallbackRaw != "" {
+			issues = filterIssues(issues, graphIncludePRs, graphState, fallbackRaw)
+		} else {
+			issues = filterIssues(issues, graphIncludePRs, graphState, graphLabel)
 		}
 
 		// Ensure comments are fetched for every issue (list mode and single-issue mode)
@@ -390,5 +443,8 @@ func init() {
 	graphCmd.Flags().IntVar(&graphDepth, "depth", 1, "Traversal depth for following references (default: 1)")
 	graphCmd.Flags().BoolVar(&graphCrossRepo, "cross-repo", false, "Allow following references across repositories when recursing")
 	graphCmd.Flags().IntVar(&graphMaxNodes, "max-nodes", 500, "Maximum number of nodes to visit during traversal (0 = unlimited)")
+	graphCmd.Flags().BoolVar(&graphIncludePRs, "include-prs", false, "Include pull requests in the initial issue selection")
+	graphCmd.Flags().StringVar(&graphLabel, "label", "", "Comma-separated label specs (exact or prefix*). Matches issues containing any of these labels")
+	graphCmd.Flags().StringVar(&graphState, "state", "", "Filter by issue state: open, closed")
 	rootCmd.AddCommand(graphCmd)
 }

@@ -18,6 +18,9 @@ import (
 
 var pulseRepo string
 var pulseLimit int
+var pulseIncludePRs bool
+var pulseLabel string
+var pulseState string
 
 var pulseCmd = &cobra.Command{
 	Use:   "pulse",
@@ -29,12 +32,11 @@ var pulseCmd = &cobra.Command{
 			return err
 		}
 
-		// If a positional arg is provided and it's an issue URL, handle single-issue mode.
 		var issues []api.Issue
 		var repoStr string
+
 		if len(args) > 0 {
 			if r, num, ok := util.ParseIssueURL(args[0]); ok {
-				// fetched single issue
 				single, err := api.GetIssue(ctx, client, r, num)
 				if err != nil {
 					return err
@@ -44,32 +46,38 @@ var pulseCmd = &cobra.Command{
 			}
 		}
 
-		// otherwise behave as before (repo detection + list)
 		if issues == nil {
 			repo, err := util.DetectRepo(pulseRepo)
 			if err != nil {
 				return err
 			}
 			repoStr = repo
-			issues, err = api.ListIssues(ctx, client, repo, pulseLimit)
+
+			// Expand label specs into exact labels for server-side querying
+			labelsForAPI, fallbackRaw, err := ExpandLabelSpecs(ctx, client, repo, pulseLabel)
 			if err != nil {
 				return err
 			}
+
+			issues, err = api.ListIssues(ctx, client, repo, pulseLimit, pulseState, labelsForAPI, pulseIncludePRs)
+			if err != nil {
+				return err
+			}
+
+			// apply client-side filters only for any unmatched wildcard prefixes
+			issues = filterIssues(issues, pulseIncludePRs, pulseState, fallbackRaw)
 		}
 
 		metrics := analyzer.ComputePulse(issues)
 
-		// Use tabwriter for neat alignment
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 		fmt.Fprintf(w, "Repository:\t%s\n\n", repoStr)
 
-		// Determine terminal width for title truncation
-		tw, _, err := term.GetSize(int(os.Stdout.Fd()))
-		if err != nil || tw <= 0 {
-			tw = 80
+		twW, _, err := term.GetSize(int(os.Stdout.Fd()))
+		if err != nil || twW <= 0 {
+			twW = 80
 		}
 
-		// compute max width among counts for right-justification
 		maxVal := 0
 		nums := []int{
 			metrics.Open, metrics.Closed, metrics.Total,
@@ -108,7 +116,7 @@ var pulseCmd = &cobra.Command{
 		for _, it := range metrics.TopByComments {
 			prefix := fmt.Sprintf("  #%d ", it.Number)
 			suffix := fmt.Sprintf(" (%d comments)", it.Comments)
-			avail := tw - len(prefix) - len(suffix) - 1
+			avail := twW - len(prefix) - len(suffix) - 1
 			if avail < 10 {
 				avail = 30
 			}
@@ -117,7 +125,6 @@ var pulseCmd = &cobra.Command{
 		}
 		fmt.Fprintln(w)
 
-		// Top labels
 		type kv struct {
 			K string
 			V int
@@ -158,6 +165,9 @@ var pulseCmd = &cobra.Command{
 func init() {
 	pulseCmd.Flags().StringVar(&pulseRepo, "repo", "", "Repository in owner/repo format (default: current repo)")
 	pulseCmd.Flags().IntVar(&pulseLimit, "limit", 100, "Maximum number of issues to analyze")
+	pulseCmd.Flags().BoolVar(&pulseIncludePRs, "include-prs", false, "Include pull requests in results")
+	pulseCmd.Flags().StringVar(&pulseLabel, "label", "", "Comma-separated label specs (exact or prefix*). Matches issues containing any of these labels")
+	pulseCmd.Flags().StringVar(&pulseState, "state", "", "Filter by issue state: open, closed")
 	rootCmd.AddCommand(pulseCmd)
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,10 +22,13 @@ type Issue struct {
 	UpdatedAt time.Time
 	ClosedAt  *time.Time
 	Comments  int
+	IsPR      bool
 }
 
 // ListIssues lists issues for the given repo (owner/repo) up to limit.
-func ListIssues(ctx context.Context, client RESTClient, repo string, limit int) ([]Issue, error) {
+// It accepts optional server-side filters: state (open/closed/all) and labels (exact match list).
+// If includePRs is false, pull requests will be filtered out client-side.
+func ListIssues(ctx context.Context, client RESTClient, repo string, limit int, state string, labels []string, includePRs bool) ([]Issue, error) {
 	var result []Issue
 	if limit <= 0 {
 		limit = 100
@@ -36,7 +40,14 @@ func ListIssues(ctx context.Context, client RESTClient, repo string, limit int) 
 	for len(result) < limit {
 		// build path
 		qs := url.Values{}
-		qs.Set("state", "all")
+		if state == "" {
+			qs.Set("state", "all")
+		} else {
+			qs.Set("state", state)
+		}
+		if len(labels) > 0 {
+			qs.Set("labels", strings.Join(labels, ","))
+		}
 		qs.Set("per_page", strconv.Itoa(perPage))
 		qs.Set("page", strconv.Itoa(page))
 		path := fmt.Sprintf("repos/%s/issues?%s", repo, qs.Encode())
@@ -80,6 +91,10 @@ func ListIssues(ctx context.Context, client RESTClient, repo string, limit int) 
 			if comments, ok := it["comments"].(float64); ok {
 				iss.Comments = int(comments)
 			}
+			// detect pull request via presence of pull_request field
+			if _, ok := it["pull_request"].(map[string]interface{}); ok {
+				iss.IsPR = true
+			}
 			if created, ok := it["created_at"].(string); ok {
 				if tm, err := time.Parse(time.RFC3339, created); err == nil {
 					iss.CreatedAt = tm
@@ -110,6 +125,11 @@ func ListIssues(ctx context.Context, client RESTClient, repo string, limit int) 
 				if login, ok := asg["login"].(string); ok {
 					iss.Assignee = login
 				}
+			}
+
+			// If PRs should be excluded, skip PRs
+			if !includePRs && iss.IsPR {
+				continue
 			}
 
 			result = append(result, iss)
@@ -158,6 +178,9 @@ func GetIssue(ctx context.Context, client RESTClient, repo string, number int) (
 	if comments, ok := m["comments"].(float64); ok {
 		iss.Comments = int(comments)
 	}
+	if _, ok := m["pull_request"].(map[string]interface{}); ok {
+		iss.IsPR = true
+	}
 	if created, ok := m["created_at"].(string); ok {
 		if tm, err := time.Parse(time.RFC3339, created); err == nil {
 			iss.CreatedAt = tm
@@ -187,5 +210,6 @@ func GetIssue(ctx context.Context, client RESTClient, repo string, number int) (
 			iss.Assignee = login
 		}
 	}
+
 	return iss, nil
 }

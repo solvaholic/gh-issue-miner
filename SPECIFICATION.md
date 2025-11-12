@@ -342,11 +342,11 @@ gh-issue-miner/
 ### Phase 3: Enhanced Filtering & Pulse
 **Goal**: Add comprehensive filtering and filter-aware pulse metrics
 
+- [x] Implement `--include-prs` filter
+- [x] Implement `--label` filter
+- [x] Implement `--state` filter
 - [ ] Implement `--assignee` filter
 - [ ] Implement `--author` filter
-- [ ] Implement `--include-prs` filter
-- [ ] Implement `--label` filter
-- [ ] Implement `--state` filter
 - [ ] Implement time range parser (relative and absolute dates)
 - [ ] Implement `--created` filter (time range)
 - [ ] Implement `--updated` filter (time range)

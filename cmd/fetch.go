@@ -15,6 +15,9 @@ import (
 
 var fetchRepo string
 var fetchLimit int
+var fetchIncludePRs bool
+var fetchLabel string
+var fetchState string
 
 var fetchCmd = &cobra.Command{
 	Use:   "fetch",
@@ -49,10 +52,20 @@ var fetchCmd = &cobra.Command{
 				return err
 			}
 			repoStr = repo
-			issues, err = api.ListIssues(ctx, client, repo, fetchLimit)
+
+			// Expand label specs into exact labels for server-side querying
+			labelsForAPI, fallbackRaw, err := ExpandLabelSpecs(ctx, client, repo, fetchLabel)
 			if err != nil {
 				return err
 			}
+
+			issues, err = api.ListIssues(ctx, client, repo, fetchLimit, fetchState, labelsForAPI, fetchIncludePRs)
+			if err != nil {
+				return err
+			}
+
+			// Apply client-side filters only for any unmatched wildcard prefixes
+			issues = filterIssues(issues, fetchIncludePRs, fetchState, fallbackRaw)
 		}
 
 		// Print repo header when available
@@ -92,4 +105,7 @@ var fetchCmd = &cobra.Command{
 func init() {
 	fetchCmd.Flags().StringVar(&fetchRepo, "repo", "", "Repository in owner/repo format (default: current repo)")
 	fetchCmd.Flags().IntVar(&fetchLimit, "limit", 100, "Maximum number of issues to fetch")
+	fetchCmd.Flags().BoolVar(&fetchIncludePRs, "include-prs", false, "Include pull requests in results")
+	fetchCmd.Flags().StringVar(&fetchLabel, "label", "", "Comma-separated label specs (exact or prefix*). Matches issues containing any of these labels")
+	fetchCmd.Flags().StringVar(&fetchState, "state", "", "Filter by issue state: open, closed")
 }
