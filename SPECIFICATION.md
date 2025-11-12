@@ -304,13 +304,13 @@ gh-issue-miner/
 ### Phase 1: Foundation (MVP)
 **Goal**: GitHub CLI extension with `fetch` and `pulse` commands
 
-- [ ] Initialize Go module and project structure
-- [ ] Set up `cobra` CLI framework
-- [ ] Integrate `go-gh` for GitHub API
-- [ ] Implement repository detection (current repo or `--repo` flag)
-- [ ] Implement `fetch` command to list issues (supports `--repo` and `--limit`)
-- [ ] Implement `pulse` command to compute core metrics (supports `--repo` and `--limit`)
-- [ ] Test installation as `gh` extension
+- [x] Initialize Go module and project structure
+- [x] Set up `cobra` CLI framework
+- [x] Integrate `go-gh` for GitHub API
+- [x] Implement repository detection (current repo or `--repo` flag)
+- [x] Implement `fetch` command to list issues (supports `--repo` and `--limit`)
+- [x] Implement `pulse` command to compute core metrics (supports `--repo` and `--limit`)
+- [x] Test installation as `gh` extension
 
 **Deliverable**: Users can run `gh issue-miner fetch` and `gh issue-miner pulse` against the current repository or a repository specified with `--repo`, with `--limit` available to bound results.
 

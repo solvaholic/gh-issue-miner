@@ -8,7 +8,11 @@ Local install (preferred during development)
 From the project root (where this README and `main.go` live) you can install the extension locally using `gh`:
 
 ```bash
-# install the extension from the current directory
+# remove the released version if previously installed
+gh extension remove gh-issue-miner
+
+# build and install the extension from the current directory
+go build -o gh-issue-miner .
 gh extension install .
 
 # verify extension is installed
@@ -42,19 +46,19 @@ Testing
 
 Uninstalling
 ------------
-To remove a locally installed extension:
+Remove the locally installed extension:
 
 ```bash
-gh extension remove solvaholic/gh-issue-miner
+gh extension remove gh-issue-miner
 ```
 
-Or to replace it with the released version:
+And replace it with the released version:
 
 ```bash
-gh extension install solvaholic/gh-issue-miner --replace
+gh extension install solvaholic/gh-issue-miner
 ```
 
 Troubleshooting
 ---------------
 - If `gh extension install` fails, ensure you have the GitHub CLI (`gh`) installed and authenticated (`gh auth login`).
-- If `gh` can't find the extension after install, make sure the executable is named or symlinked appropriately and that you used `--replace` when updating.
+- If `gh` can't find the extension after install, make sure the executable is available in the root of your local repository.
