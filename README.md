@@ -28,6 +28,16 @@ graph      | --limit 100     | Graph issues and links in/out
 FUTURE?:
 summarize | --state open | Summarize issues in a repository
 -->
+## Installation
+
+Install from GitHub (recommended):
+
+```bash
+gh extension install solvaholic/gh-issue-miner
+```
+
+Local development: see `DEVELOPER.md` for local install and testing instructions (`gh extension install .`).
+
 
 ## Filters
 `issue-miner` supports a variety of filters to narrow down the issues you want to analyze. Here they are, with their default values:
