@@ -336,7 +336,7 @@ gh-issue-miner/
 - [x] Extract and attach full edge metadata: actor (username), timestamp, action type (e.g., "referenced", "closed"), and source (`timeline` vs `parsed` vs `comment`)
 - [x] Comment-level attribution: capture comment id, author, and timestamp for parsed references and include that context on edges
 - [x] Resolve ambiguous short references (`#123`) when possible and surface unresolved/ambiguous short refs as warnings
-- [ ] Implement recursive graph resolution with `--depth` and cycle detection; limit cross-repo expansion to avoid explosion
+- [x] Implement recursive graph resolution with `--depth` and cycle detection; limit cross-repo expansion to avoid explosion
 - [ ] Implement rate-limit and performance strategies: batching, exponential backoff, and limits for large repositories
 
 ### Phase 3: Enhanced Filtering & Pulse

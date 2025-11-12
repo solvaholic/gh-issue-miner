@@ -17,6 +17,8 @@ import (
 
 var graphRepo string
 var graphLimit int
+var graphDepth int
+var graphCrossRepo bool
 
 var graphCmd = &cobra.Command{
 	Use:   "graph",
@@ -113,52 +115,141 @@ var graphCmd = &cobra.Command{
 		timelineCache := map[string][]api.TimelineEvent{}
 		var tcMu sync.Mutex
 
+		// Use a semaphore to limit concurrent timeline fetches and an inflight map
+		timelineSem := make(chan struct{}, 5)
+		type tlResult struct {
+			evs []api.TimelineEvent
+			err error
+		}
+		inflight := map[string]chan tlResult{}
+		var inflightMu sync.Mutex
+
 		// helper to get timeline events for a dest (owner/repo and number)
 		getTimeline := func(ownerRepo string, number int) ([]api.TimelineEvent, error) {
 			key := fmt.Sprintf("%s#%d", ownerRepo, number)
+			// check cache
 			tcMu.Lock()
 			evs, ok := timelineCache[key]
 			tcMu.Unlock()
 			if ok {
 				return evs, nil
 			}
-			evs, err := api.GetIssueTimeline(ctx, client, ownerRepo, number)
-			if err != nil {
-				return nil, err
+
+			// dedupe inflight requests
+			inflightMu.Lock()
+			ch, ok := inflight[key]
+			if ok {
+				inflightMu.Unlock()
+				res := <-ch
+				return res.evs, res.err
 			}
-			tcMu.Lock()
-			timelineCache[key] = evs
-			tcMu.Unlock()
-			return evs, nil
+			ch = make(chan tlResult, 1)
+			inflight[key] = ch
+			inflightMu.Unlock()
+
+			// perform fetch in a goroutine but block here until it's done
+			go func() {
+				timelineSem <- struct{}{}
+				evs, err := api.GetIssueTimeline(ctx, client, ownerRepo, number)
+				<-timelineSem
+
+				if err == nil {
+					tcMu.Lock()
+					timelineCache[key] = evs
+					tcMu.Unlock()
+				}
+
+				inflightMu.Lock()
+				ch <- tlResult{evs: evs, err: err}
+				delete(inflight, key)
+				inflightMu.Unlock()
+				close(ch)
+			}()
+
+			res := <-ch
+			return res.evs, res.err
 		}
 
-		for _, it := range issues {
-			// source repository for this issue (short refs resolve to this repo)
-			srcRepo := repo
-			srcKey := fmt.Sprintf("%s#%d", srcRepo, it.Number)
+		// We'll perform a breadth-first traversal up to graphDepth, starting from the initial issues.
+		type visitItem struct {
+			Repo   string
+			Number int
+			Depth  int
+		}
 
-			// parse references in the issue body first
+		maxDepth := graphDepth
+		allowCross := graphCrossRepo
+
+		// cache fetched issues by key owner/repo#num
+		issuesCache := map[string]api.Issue{}
+		// comments by key
+		commentsCache := map[string][]api.Comment{}
+
+		// seeded queue: initial issues
+		var q []visitItem
+		for _, it := range issues {
+			key := fmt.Sprintf("%s#%d", repo, it.Number)
+			issuesCache[key] = it
+			// also store any pre-fetched comments (from earlier single-issue concatenation, none here)
+			q = append(q, visitItem{Repo: repo, Number: it.Number, Depth: 0})
+		}
+
+		// visited set for cycle detection
+		visited := map[string]bool{}
+
+		for len(q) > 0 {
+			cur := q[0]
+			q = q[1:]
+			srcKey := fmt.Sprintf("%s#%d", cur.Repo, cur.Number)
+			if visited[srcKey] {
+				continue
+			}
+			visited[srcKey] = true
+
+			// ensure a header is present even if this node has no outgoing edges
+			if _, ok := adj[srcKey]; !ok {
+				adj[srcKey] = map[string]Edge{}
+			}
+
+			// ensure issue is fetched
+			it, ok := issuesCache[srcKey]
+			if !ok {
+				fetched, err := api.GetIssue(ctx, client, cur.Repo, cur.Number)
+				if err != nil {
+					// skip if we cannot fetch the issue
+					continue
+				}
+				it = fetched
+				issuesCache[srcKey] = it
+			}
+
+			// fetch comments if not present
+			if _, ok := commentsCache[srcKey]; !ok {
+				cms, _ := api.ListIssueComments(ctx, client, cur.Repo, cur.Number)
+				if len(cms) > 0 {
+					commentsCache[srcKey] = cms
+				}
+			}
+
+			// parse refs from body
+			srcRepo := cur.Repo
 			bodyRefs := parser.ParseReferences(it.Body)
 			for _, r := range bodyRefs {
 				var destOwner string
 				if r.OwnerRepo != "" {
 					destOwner = r.OwnerRepo
 				} else {
-					// short refs (#123) resolve to the repository where they are mentioned
 					destOwner = srcRepo
 				}
 				destKey := fmt.Sprintf("%s#%d", destOwner, r.Number)
 
-				// attempt to annotate via timeline on the destination issue
 				var edge Edge
 				edge.Dest = destKey
 				edge.Source = "body"
 
 				if evs, err := getTimeline(destOwner, r.Number); err == nil {
-					// look for an event where the source issue is this issue
 					for _, ev := range evs {
-						// match by source issue number and owner (owner may be empty if same repo)
-						if ev.SourceIssueNumber == it.Number && (ev.SourceOwnerRepo == "" || ev.SourceOwnerRepo == srcRepo || ev.SourceOwnerRepo == destOwner) {
+						if ev.SourceIssueNumber == cur.Number && (ev.SourceOwnerRepo == "" || ev.SourceOwnerRepo == srcRepo || ev.SourceOwnerRepo == destOwner) {
 							edge.Actor = ev.Actor
 							edge.Timestamp = ev.CreatedAt
 							edge.Action = ev.Type
@@ -168,16 +259,26 @@ var graphCmd = &cobra.Command{
 					}
 				}
 
-				// dedupe key uses dest, source, actor, action, timestamp, comment id
 				dk := fmt.Sprintf("%s|%s|%s|%s|%d|%d", edge.Dest, edge.Source, edge.Actor, edge.Action, edge.Timestamp.UnixNano(), edge.CommentID)
 				if _, ok := adj[srcKey]; !ok {
 					adj[srcKey] = map[string]Edge{}
 				}
 				adj[srcKey][dk] = edge
+
+				// follow this destination if depth allows
+				if cur.Depth+1 <= maxDepth {
+					// decide cross-repo expansion
+					if destOwner == cur.Repo || allowCross {
+						// enqueue dest
+						if !visited[destKey] {
+							q = append(q, visitItem{Repo: destOwner, Number: r.Number, Depth: cur.Depth + 1})
+						}
+					}
+				}
 			}
 
-			// parse references inside each comment and attribute to comment author/time
-			if cms, ok := issueComments[it.Number]; ok {
+			// parse refs from comments and attribute
+			if cms, ok := commentsCache[srcKey]; ok {
 				for _, c := range cms {
 					crefs := parser.ParseReferences(c.Body)
 					for _, r := range crefs {
@@ -185,7 +286,6 @@ var graphCmd = &cobra.Command{
 						if r.OwnerRepo != "" {
 							destOwner = r.OwnerRepo
 						} else {
-							// short refs in comments resolve to the repository where the comment was made
 							destOwner = srcRepo
 						}
 						destKey := fmt.Sprintf("%s#%d", destOwner, r.Number)
@@ -197,10 +297,9 @@ var graphCmd = &cobra.Command{
 						edge.Timestamp = c.CreatedAt
 						edge.CommentID = c.ID
 
-						// prefer timeline metadata when available
 						if evs, err := getTimeline(destOwner, r.Number); err == nil {
 							for _, ev := range evs {
-								if ev.SourceIssueNumber == it.Number && (ev.SourceOwnerRepo == "" || ev.SourceOwnerRepo == srcRepo || ev.SourceOwnerRepo == destOwner) {
+								if ev.SourceIssueNumber == cur.Number && (ev.SourceOwnerRepo == "" || ev.SourceOwnerRepo == srcRepo || ev.SourceOwnerRepo == destOwner) {
 									edge.Actor = ev.Actor
 									edge.Timestamp = ev.CreatedAt
 									edge.Action = ev.Type
@@ -216,6 +315,14 @@ var graphCmd = &cobra.Command{
 							adj[srcKey] = map[string]Edge{}
 						}
 						adj[srcKey][dk] = edge
+
+						if cur.Depth+1 <= maxDepth {
+							if destOwner == cur.Repo || allowCross {
+								if !visited[destKey] {
+									q = append(q, visitItem{Repo: destOwner, Number: r.Number, Depth: cur.Depth + 1})
+								}
+							}
+						}
 					}
 				}
 			}
@@ -249,5 +356,7 @@ var graphCmd = &cobra.Command{
 func init() {
 	graphCmd.Flags().StringVar(&graphRepo, "repo", "", "Repository in owner/repo format (default: current repo)")
 	graphCmd.Flags().IntVar(&graphLimit, "limit", 100, "Maximum number of issues to include in the graph")
+	graphCmd.Flags().IntVar(&graphDepth, "depth", 1, "Traversal depth for following references (default: 1)")
+	graphCmd.Flags().BoolVar(&graphCrossRepo, "cross-repo", false, "Allow following references across repositories when recursing")
 	rootCmd.AddCommand(graphCmd)
 }
