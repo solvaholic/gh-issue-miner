@@ -33,9 +33,29 @@ var fetchCmd = &cobra.Command{
 		var issues []api.Issue
 		var repoStr string
 
-		// If a positional arg is provided and it's an issue URL, fetch that single issue.
+		// If a positional arg is provided and it's an issue URL, treat it as exclusive with filters.
 		if len(args) > 0 {
 			if r, num, ok := util.ParseIssueURL(args[0]); ok {
+				var conflict []string
+				if cmd.Flags().Changed("label") {
+					conflict = append(conflict, "--label")
+				}
+				if cmd.Flags().Changed("state") {
+					conflict = append(conflict, "--state")
+				}
+				if cmd.Flags().Changed("include-prs") {
+					conflict = append(conflict, "--include-prs")
+				}
+				if cmd.Flags().Changed("repo") {
+					conflict = append(conflict, "--repo")
+				}
+				if cmd.Flags().Changed("limit") {
+					conflict = append(conflict, "--limit")
+				}
+				if len(conflict) > 0 {
+					return fmt.Errorf("positional issue URL cannot be combined with filters: %s", strings.Join(conflict, ", "))
+				}
+
 				single, err := api.GetIssue(ctx, client, r, num)
 				if err != nil {
 					return err

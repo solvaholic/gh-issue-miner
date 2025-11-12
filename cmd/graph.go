@@ -41,6 +41,27 @@ var graphCmd = &cobra.Command{
 		// If given a positional issue URL, fetch that issue and its comments
 		if len(args) > 0 {
 			if r, num, ok := util.ParseIssueURL(args[0]); ok {
+				// positional URL is exclusive with selection filters
+				var conflict []string
+				if cmd.Flags().Changed("label") {
+					conflict = append(conflict, "--label")
+				}
+				if cmd.Flags().Changed("state") {
+					conflict = append(conflict, "--state")
+				}
+				if cmd.Flags().Changed("include-prs") {
+					conflict = append(conflict, "--include-prs")
+				}
+				if cmd.Flags().Changed("repo") {
+					conflict = append(conflict, "--repo")
+				}
+				if cmd.Flags().Changed("limit") {
+					conflict = append(conflict, "--limit")
+				}
+				if len(conflict) > 0 {
+					return fmt.Errorf("positional issue URL cannot be combined with filters: %s", strings.Join(conflict, ", "))
+				}
+
 				repo = r
 				single, err := api.GetIssue(ctx, client, r, num)
 				if err != nil {
