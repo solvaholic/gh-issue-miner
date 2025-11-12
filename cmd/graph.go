@@ -19,6 +19,7 @@ var graphRepo string
 var graphLimit int
 var graphDepth int
 var graphCrossRepo bool
+var graphMaxNodes int
 
 var graphCmd = &cobra.Command{
 	Use:   "graph",
@@ -187,11 +188,21 @@ var graphCmd = &cobra.Command{
 
 		// seeded queue: initial issues
 		var q []visitItem
+		nodesSeen := map[string]bool{}
+		nodesCount := 0
+		limitHit := false
 		for _, it := range issues {
 			key := fmt.Sprintf("%s#%d", repo, it.Number)
 			issuesCache[key] = it
-			// also store any pre-fetched comments (from earlier single-issue concatenation, none here)
-			q = append(q, visitItem{Repo: repo, Number: it.Number, Depth: 0})
+			if !nodesSeen[key] {
+				if graphMaxNodes > 0 && nodesCount >= graphMaxNodes {
+					limitHit = true
+				} else {
+					nodesSeen[key] = true
+					nodesCount++
+					q = append(q, visitItem{Repo: repo, Number: it.Number, Depth: 0})
+				}
+			}
 		}
 
 		// visited set for cycle detection
@@ -269,9 +280,17 @@ var graphCmd = &cobra.Command{
 				if cur.Depth+1 <= maxDepth {
 					// decide cross-repo expansion
 					if destOwner == cur.Repo || allowCross {
-						// enqueue dest
+						// enqueue dest if we haven't seen it and haven't hit the node limit
 						if !visited[destKey] {
-							q = append(q, visitItem{Repo: destOwner, Number: r.Number, Depth: cur.Depth + 1})
+							if !nodesSeen[destKey] {
+								if graphMaxNodes > 0 && nodesCount >= graphMaxNodes {
+									limitHit = true
+								} else {
+									nodesSeen[destKey] = true
+									nodesCount++
+									q = append(q, visitItem{Repo: destOwner, Number: r.Number, Depth: cur.Depth + 1})
+								}
+							}
 						}
 					}
 				}
@@ -319,11 +338,23 @@ var graphCmd = &cobra.Command{
 						if cur.Depth+1 <= maxDepth {
 							if destOwner == cur.Repo || allowCross {
 								if !visited[destKey] {
-									q = append(q, visitItem{Repo: destOwner, Number: r.Number, Depth: cur.Depth + 1})
+									if !nodesSeen[destKey] {
+										if graphMaxNodes > 0 && nodesCount >= graphMaxNodes {
+											limitHit = true
+										} else {
+											nodesSeen[destKey] = true
+											nodesCount++
+											q = append(q, visitItem{Repo: destOwner, Number: r.Number, Depth: cur.Depth + 1})
+										}
+									}
 								}
 							}
 						}
 					}
+				}
+
+				if limitHit {
+					fmt.Fprintf(os.Stderr, "warning: traversal hit --max-nodes=%d; some referenced nodes were not expanded\n", graphMaxNodes)
 				}
 			}
 		}
@@ -358,5 +389,6 @@ func init() {
 	graphCmd.Flags().IntVar(&graphLimit, "limit", 100, "Maximum number of issues to include in the graph")
 	graphCmd.Flags().IntVar(&graphDepth, "depth", 1, "Traversal depth for following references (default: 1)")
 	graphCmd.Flags().BoolVar(&graphCrossRepo, "cross-repo", false, "Allow following references across repositories when recursing")
+	graphCmd.Flags().IntVar(&graphMaxNodes, "max-nodes", 500, "Maximum number of nodes to visit during traversal (0 = unlimited)")
 	rootCmd.AddCommand(graphCmd)
 }

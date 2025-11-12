@@ -9,6 +9,9 @@ gh issue-miner pulse --repo octocat/Hello-World --limit 100
 
 # Fetch 20 issues from a repository
 gh issue-miner fetch --repo octocat/Hello-World --limit 20
+
+# Graph an issue and its references up to depth 2, allowing cross-repo links
+gh issue-miner graph https://github.com/octocat/Hello-World/issues/349 --depth 2 --cross-repo
 ```
 
 ## Subcommands
@@ -18,16 +21,13 @@ Subcommand | Default Filters | Description
 ---        | ---             | ---
 fetch      | --limit 100     | List issues and their basic details
 pulse      | --limit 100     | Show pulse metrics about issues
-
-<!--
-PHASE 2:
-graph      | --limit 100     | Graph issues and links in/out
--->
+graph      | --limit 100 --depth 1 --max-nodes 500 | Graph issues and links in/out
 
 <!--
 FUTURE?:
 summarize | --state open | Summarize issues in a repository
 -->
+
 ## Installation
 
 Install from GitHub (recommended):
@@ -40,13 +40,21 @@ Local development: see `DEVELOPER.md` for local install and testing instructions
 
 
 ## Filters
-`issue-miner` supports a variety of filters to narrow down the issues you want to analyze. Here they are, with their default values:
+`issue-miner` supports a variety of filters to narrow down the issues you want to analyze. Here are the common filters, with their default values:
 
 Filter   | Default | Description
 ---      | ---     | ---
 <url>    |         | URL of an issue to analyze (all other filters will be ignored)
 --repo   | `origin` remote | NWO or URL of the repository to analyze
 --limit  | 100     | Maximum number of issues to return
+
+These filters apply only to the `graph` command:
+
+Filter       | Default  | Description
+---          | ---      | ---
+--depth      | 1        | Traversal depth for following references (default: 1)
+--max-nodes  | 500      | Maximum number of nodes to visit during traversal (0 = unlimited)
+--cross-repo | false    | Allow following references across repositories when recursing
 
 <!--
 PHASE 3:

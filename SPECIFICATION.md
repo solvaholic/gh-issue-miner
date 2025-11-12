@@ -337,7 +337,7 @@ gh-issue-miner/
 - [x] Comment-level attribution: capture comment id, author, and timestamp for parsed references and include that context on edges
 - [x] Resolve ambiguous short references (`#123`) when possible and surface unresolved/ambiguous short refs as warnings
 - [x] Implement recursive graph resolution with `--depth` and cycle detection; limit cross-repo expansion to avoid explosion
-- [ ] Implement rate-limit and performance strategies: batching, exponential backoff, and limits for large repositories
+ - [x] Implement rate-limit and performance strategies: batching, exponential backoff, and limits for large repositories
 
 ### Phase 3: Enhanced Filtering & Pulse
 **Goal**: Add comprehensive filtering and filter-aware pulse metrics
