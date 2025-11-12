@@ -54,8 +54,11 @@ Filter   | Default | Description
 `--repo`   | `origin` remote | NWO or URL of the repository to analyze
 `--limit`  | 100     | Maximum number of issues to select
 `--include-prs` | true | Include pull requests in the selection
-`--labels` | all     | Select issues with these labels (comma-separated)
+`--labels` |      | Select issues with these labels (comma-separated)
 `--state`  | open    | Select issues with this state (open, closed)
+`--created`   |  | Issues created within this time frame<br />(e.g., `30d`, `90d..60d`, `2025-02-01..`)
+`--updated`   |  | Issues updated within this time frame<br />(e.g., `30d`, `90d..60d`, `2025-02-01..`)
+`--closed`    |  | Issues closed within this time frame<br />(e.g., `30d`, `90d..60d`, `2025-02-01..`)
 
 Options that change processing or output (not selection):
 
@@ -70,13 +73,45 @@ Option       | Default  | Description
 
 Important: when running the `graph` command, filters affect only the initial issue selection (the set of starting issues). The graph traversal/expansion step is controlled by options such as `--depth` and `--cross-repo` and may discover and include additional issues that were not part of the initial filtered set.
 
+## Examples: Time-based filters
+Here are a couple of examples showing how to use the new time filters.
+
+- Fetch issues created on or after a date (single-day selection uses the whole day):
+
+```bash
+# issues created on 2025-11-01 (local date interpreted as UTC day)
+gh issue-miner fetch --repo owner/repo --created 2025-11-01
+```
+
+- Fetch issues created between two dates (inclusive):
+
+```bash
+# issues created from 2025-10-01 through 2025-10-31 (inclusive)
+gh issue-miner fetch --repo owner/repo --created 2025-10-01..2025-10-31
+```
+
+- Fetch issues updated within the last 30 days:
+
+```bash
+gh issue-miner pulse --repo owner/repo --updated 30d
+```
+
+- Fetch issues created after a date (open-ended range):
+
+```bash
+# issues created on/after 2025-11-02 (use open-ended range up to now)
+gh issue-miner fetch --repo owner/repo --created 2025-11-02..
+```
+
+Notes:
+- Dates use `YYYY-MM-DD` and are interpreted as that UTC day (start at 00:00 UTC).
+- Ranges are inclusive of the start date and inclusive of the end date (implemented as end-of-day).
+- Relative forms like `7d` mean "last 7 days" (from now back 7×24h).
+
 <!--
 PHASE 3:
 --assignee  | all | Issues assigned to this user
 --author    | all | Issues created by this author
---created   | all | Issues created within this time frame<br />(e.g., `30days`, `90-60days`, `2025-02-01`)
---updated   | all | Issues updated within this time frame<br />(e.g., `30days`, `90-60days`, `2025-02-01`)
---closed    | all | Issues closed within this time frame<br />(e.g., `30days`, `90-60days`, `2025-02-01`)
 -->
 
 <!--

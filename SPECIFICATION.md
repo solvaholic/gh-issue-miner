@@ -360,10 +360,10 @@ gh-issue-miner/
 - [x] Implement `--state` filter
 - [ ] Implement `--assignee` filter
 - [ ] Implement `--author` filter
-- [ ] Implement time range parser (relative and absolute dates)
-- [ ] Implement `--created` filter (time range)
-- [ ] Implement `--updated` filter (time range)
-- [ ] Implement `--closed` filter (time range)
+- [x] Implement time range parser (relative and absolute dates)
+- [x] Implement `--created` filter (time range)
+- [x] Implement `--updated` filter (time range)
+- [x] Implement `--closed` filter (time range)
 - [ ] Update pulse command to respect all filters
 - [ ] Add filter summary to pulse output
 - [ ] Add `--sort` and `--order` options

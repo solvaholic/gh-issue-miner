@@ -18,6 +18,9 @@ var fetchLimit int
 var fetchIncludePRs bool
 var fetchLabel string
 var fetchState string
+var fetchCreated string
+var fetchUpdated string
+var fetchClosed string
 
 var fetchCmd = &cobra.Command{
 	Use:   "fetch",
@@ -85,7 +88,10 @@ var fetchCmd = &cobra.Command{
 			}
 
 			// Apply client-side filters only for any unmatched wildcard prefixes
-			issues = filterIssues(issues, fetchIncludePRs, fetchState, fallbackRaw)
+			issues, err = filterIssues(issues, fetchIncludePRs, fetchState, fallbackRaw, fetchCreated, fetchUpdated, fetchClosed)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Print repo header when available
@@ -128,4 +134,7 @@ func init() {
 	fetchCmd.Flags().BoolVar(&fetchIncludePRs, "include-prs", false, "Include pull requests in results")
 	fetchCmd.Flags().StringVar(&fetchLabel, "label", "", "Comma-separated label specs (exact or prefix*). Matches issues containing any of these labels")
 	fetchCmd.Flags().StringVar(&fetchState, "state", "", "Filter by issue state: open, closed")
+	fetchCmd.Flags().StringVar(&fetchCreated, "created", "", "Filter by created timeframe (e.g., 7d, 2025-01-01, 2025-01-01..2025-01-31)")
+	fetchCmd.Flags().StringVar(&fetchUpdated, "updated", "", "Filter by updated timeframe (e.g., 7d, 2025-01-01)")
+	fetchCmd.Flags().StringVar(&fetchClosed, "closed", "", "Filter by closed timeframe (e.g., 30d, 2025-01-01..2025-02-01)")
 }

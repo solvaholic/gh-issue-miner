@@ -23,6 +23,9 @@ var graphMaxNodes int
 var graphIncludePRs bool
 var graphLabel string
 var graphState string
+var graphCreated string
+var graphUpdated string
+var graphClosed string
 
 var graphCmd = &cobra.Command{
 	Use:   "graph",
@@ -57,6 +60,15 @@ var graphCmd = &cobra.Command{
 				}
 				if cmd.Flags().Changed("limit") {
 					conflict = append(conflict, "--limit")
+				}
+				if cmd.Flags().Changed("created") {
+					conflict = append(conflict, "--created")
+				}
+				if cmd.Flags().Changed("updated") {
+					conflict = append(conflict, "--updated")
+				}
+				if cmd.Flags().Changed("closed") {
+					conflict = append(conflict, "--closed")
 				}
 				if len(conflict) > 0 {
 					return fmt.Errorf("positional issue URL cannot be combined with filters: %s", strings.Join(conflict, ", "))
@@ -144,9 +156,15 @@ var graphCmd = &cobra.Command{
 		// But if we expanded wildcard patterns above, apply fallback client-side filtering
 		fallbackRaw := strings.Join(fallbackPrefixes, ",")
 		if fallbackRaw != "" {
-			issues = filterIssues(issues, graphIncludePRs, graphState, fallbackRaw)
+			issues, err = filterIssues(issues, graphIncludePRs, graphState, fallbackRaw, graphCreated, graphUpdated, graphClosed)
+			if err != nil {
+				return err
+			}
 		} else {
-			issues = filterIssues(issues, graphIncludePRs, graphState, graphLabel)
+			issues, err = filterIssues(issues, graphIncludePRs, graphState, graphLabel, graphCreated, graphUpdated, graphClosed)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Ensure comments are fetched for every issue (list mode and single-issue mode)
@@ -467,5 +485,8 @@ func init() {
 	graphCmd.Flags().BoolVar(&graphIncludePRs, "include-prs", false, "Include pull requests in the initial issue selection")
 	graphCmd.Flags().StringVar(&graphLabel, "label", "", "Comma-separated label specs (exact or prefix*). Matches issues containing any of these labels")
 	graphCmd.Flags().StringVar(&graphState, "state", "", "Filter by issue state: open, closed")
+	graphCmd.Flags().StringVar(&graphCreated, "created", "", "Filter by created timeframe (e.g., 7d, 2025-01-01, 2025-01-01..2025-01-31)")
+	graphCmd.Flags().StringVar(&graphUpdated, "updated", "", "Filter by updated timeframe (e.g., 7d, 2025-01-01)")
+	graphCmd.Flags().StringVar(&graphClosed, "closed", "", "Filter by closed timeframe (e.g., 30d, 2025-01-01..2025-02-01)")
 	rootCmd.AddCommand(graphCmd)
 }

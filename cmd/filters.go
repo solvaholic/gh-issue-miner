@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/solvaholic/gh-issue-miner/internal/api"
 )
@@ -53,9 +56,27 @@ func (ls *labelSpec) matches(labels []string) bool {
 }
 
 // filterIssues applies include-prs, state, and label filtering to the initial issue list.
-func filterIssues(issueList []api.Issue, includePRs bool, stateFilter string, labelRaw string) []api.Issue {
+// filterIssues applies include-prs, state, label, and time-range filters
+// to the initial issue list. Time filters are provided as raw strings:
+// - relative: `7d` means issues from now-7days..now
+// - date: `2025-01-02` means that day
+// - range: `2025-01-01..2025-01-31` inclusive
+func filterIssues(issueList []api.Issue, includePRs bool, stateFilter string, labelRaw string, createdRaw string, updatedRaw string, closedRaw string) ([]api.Issue, error) {
 	var out []api.Issue
 	ls := parseLabelSpecs(labelRaw)
+	// parse time ranges
+	cStart, cEnd, cErr := parseTimeRange(createdRaw)
+	if cErr != nil {
+		return nil, cErr
+	}
+	uStart, uEnd, uErr := parseTimeRange(updatedRaw)
+	if uErr != nil {
+		return nil, uErr
+	}
+	clStart, clEnd, clErr := parseTimeRange(closedRaw)
+	if clErr != nil {
+		return nil, clErr
+	}
 	// allow empty stateFilter to mean no filtering
 	for _, it := range issueList {
 		if !includePRs && it.IsPR {
@@ -71,9 +92,129 @@ func filterIssues(issueList []api.Issue, includePRs bool, stateFilter string, la
 				continue
 			}
 		}
+		// created
+		if createdRaw != "" {
+			if !timeInRange(it.CreatedAt, cStart, cEnd) {
+				continue
+			}
+		}
+		// updated
+		if updatedRaw != "" {
+			if !timeInRange(it.UpdatedAt, uStart, uEnd) {
+				continue
+			}
+		}
+		// closed
+		if closedRaw != "" {
+			if it.ClosedAt == nil {
+				continue
+			}
+			if !timeInRange(it.ClosedAt.UTC(), clStart, clEnd) {
+				continue
+			}
+		}
 		out = append(out, it)
 	}
-	return out
+	return out, nil
+}
+
+// parseTimeRange parses supported time range syntaxes and returns start (inclusive)
+// and end (exclusive) times in UTC. Empty input returns nil,nil,nil.
+func parseTimeRange(raw string) (*time.Time, *time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil, nil
+	}
+	now := time.Now().UTC()
+	// range like left..right where each side may be a date (YYYY-MM-DD)
+	// or a relative like 7d. Handle ranges first so inputs like "60d..45d"
+	// are parsed as intended.
+	if strings.Contains(raw, "..") {
+		parts := strings.SplitN(raw, "..", 2)
+		a := strings.TrimSpace(parts[0])
+		b := strings.TrimSpace(parts[1])
+		var start *time.Time
+		var end *time.Time
+
+		// helper to parse a single side used for start (left) and end (right)
+		parseSide := func(part string, isRight bool) (*time.Time, error) {
+			if part == "" {
+				return nil, nil
+			}
+			// relative like 7d
+			if strings.HasSuffix(part, "d") {
+				nstr := strings.TrimSuffix(part, "d")
+				n, err := strconv.Atoi(nstr)
+				if err != nil || n <= 0 {
+					return nil, fmt.Errorf("invalid relative timeframe: %s", part)
+				}
+				tm := now.Add(time.Duration(-n) * 24 * time.Hour).UTC()
+				// for range semantics we align to day boundaries: start -> 00:00, end -> 00:00 next day
+				dayStart := time.Date(tm.Year(), tm.Month(), tm.Day(), 0, 0, 0, 0, time.UTC)
+				if isRight {
+					e := dayStart.Add(24 * time.Hour)
+					return &e, nil
+				}
+				return &dayStart, nil
+			}
+			// ISO date YYYY-MM-DD
+			if t, err := time.Parse("2006-01-02", part); err == nil {
+				t = t.UTC()
+				if isRight {
+					e := t.Add(24 * time.Hour)
+					return &e, nil
+				}
+				return &t, nil
+			}
+			return nil, fmt.Errorf("invalid date or relative timeframe: %s", part)
+		}
+
+		if a != "" {
+			s, err := parseSide(a, false)
+			if err != nil {
+				return nil, nil, fmt.Errorf("invalid start date: %w", err)
+			}
+			start = s
+		}
+		if b != "" {
+			e, err := parseSide(b, true)
+			if err != nil {
+				return nil, nil, fmt.Errorf("invalid end date: %w", err)
+			}
+			end = e
+		}
+		return start, end, nil
+	}
+
+	// relative like 7d (single relative window -> from now-N .. now)
+	if strings.HasSuffix(raw, "d") {
+		n := 0
+		_, err := fmt.Sscanf(raw, "%dd", &n)
+		if err != nil || n <= 0 {
+			return nil, nil, fmt.Errorf("invalid relative timeframe: %s", raw)
+		}
+		start := now.Add(time.Duration(-n) * 24 * time.Hour)
+		end := now.Add(time.Second)
+		return &start, &end, nil
+	}
+	// single date YYYY-MM-DD
+	if t, err := time.Parse("2006-01-02", raw); err == nil {
+		start := t.UTC()
+		end := start.Add(24 * time.Hour)
+		return &start, &end, nil
+	}
+	return nil, nil, fmt.Errorf("unsupported time range format: %s", raw)
+}
+
+func timeInRange(t time.Time, start *time.Time, end *time.Time) bool {
+	t = t.UTC()
+	if start != nil && t.Before(*start) {
+		return false
+	}
+	if end != nil && !t.Before(*end) {
+		return false
+	}
+	return true
 }
 
 // ExpandLabelSpecs expands comma-separated label specs where trailing '*' indicates
