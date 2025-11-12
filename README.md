@@ -39,25 +39,36 @@ gh extension install solvaholic/gh-issue-miner
 Local development: see `DEVELOPER.md` for local install and testing instructions (`gh extension install .`).
 
 
-## Filters
-`issue-miner` supports a variety of filters to narrow down the issues you want to analyze. Here are the common filters, with their default values:
+## Filters vs Options
+
+`issue-miner` distinguishes between filters and options so it's clear what affects issue selection vs processing/output.
+
+- Filters: narrow which issues/PRs are selected for analysis. Examples: `--repo`, `--limit`, `--labels`, `--state`, `--include-prs`, and a positional issue `<url>`.
+- Options: control how selected issues are processed or how results are presented (for example `--depth`, `--max-nodes`, `--cross-repo`, `--format`, `--sort`).
+
+Below are the common filters with their defaults:
 
 Filter   | Default | Description
 ---      | ---     | ---
-<url>    |         | URL of an issue to analyze (all other filters will be ignored)
---repo   | `origin` remote | NWO or URL of the repository to analyze
---limit  | 100     | Maximum number of issues to select
---include-prs | true | Select pull requests as well as issues
---labels | all     | Select issues with these labels (comma-separated)
---state  | open    | Select issues with this state or status (open, closed)
+`<url>`    |         | URL of an issue to analyze (all other filters will be ignored)
+`--repo`   | `origin` remote | NWO or URL of the repository to analyze
+`--limit`  | 100     | Maximum number of issues to select
+`--include-prs` | true | Include pull requests in the selection
+`--labels` | all     | Select issues with these labels (comma-separated)
+`--state`  | open    | Select issues with this state (open, closed)
 
-These filters apply only to the `graph` command:
+Options that change processing or output (not selection):
 
-Filter       | Default  | Description
+Option       | Default  | Description
 ---          | ---      | ---
---depth      | 1        | Traversal depth for following references (default: 1)
---max-nodes  | 500      | Maximum number of nodes to visit during traversal (0 = unlimited)
---cross-repo | false    | Allow following references across repositories when recursing
+`--depth`      | 1        | Traversal depth when graphing references (affects processing only)
+`--max-nodes`  | 500      | Maximum number of nodes to visit during graph traversal (0 = unlimited)
+`--cross-repo` | false    | Allow following references across repositories when recursing (processing option)
+`--format`     | text     | Output format (`text`, `json`, `dot`)
+`--sort`       | created_at | Sort field for output
+`--order`      | desc     | Sort order
+
+Important: when running the `graph` command, filters affect only the initial issue selection (the set of starting issues). The graph traversal/expansion step is controlled by options such as `--depth` and `--cross-repo` and may discover and include additional issues that were not part of the initial filtered set.
 
 <!--
 PHASE 3:

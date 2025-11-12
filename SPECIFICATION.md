@@ -69,30 +69,43 @@
 - Parse issue body/comments for cross-references
 
 ### 4. Filtering System
-**Purpose**: Allow users to narrow down issues for analysis
+**Purpose**: Allow users to narrow down issues for analysis and to separate selection concerns from processing/output concerns.
 
-**Required Filters** (v1.0):
+Definitions
+- **Filters**: affect which issues/PRs are selected for analysis. Examples: `--repo`, `--limit`, `--labels`, `--state`, `--include-prs`, and a positional issue `<url>`.
+- **Options**: control how selected issues are processed or how results are presented (for example `--depth`, `--max-nodes`, `--cross-repo`, `--format`, `--sort`).
+
+Required Filters (v1.0):
 - `--repo <NWO>`: Repository in `owner/repo` format (default: current repo from git). Commands operate on the current repository when `--repo` is not provided.
 - `--limit <n>`: Maximum number of issues (default: 100).
 
 Note: For the Phase 1 release, only `--repo` and `--limit` are supported. `--state` and other filters are planned for later phases.
 
-**Enhanced Filters** (Phase 3):
+Enhanced Filters (Phase 3):
 - `--label <labels>`: Comma-separated list of labels
 - `--assignee <user>`: Filter by assignee
 - `--author <user>`: Filter by author
 - `--created <timeframe>`: Issues created within timeframe (e.g., `7d`, `30d`, `2024-01-01..2024-12-31`)
 - `--closed <timeframe>`: Issues closed within timeframe (e.g., `7d`, `30d`, `2024-01-01..2024-12-31`)
 
-**Future Filters** (post-v1.0):
+Future Filters (post-v1.0):
 - `--updated <timeframe>`: Issues updated within timeframe
 - `--milestone <name>`: Filter by milestone
 - `--mentioned <user>`: Issues mentioning user
 
-**Technical Approach**:
+Technical Approach:
 - Build GraphQL query filters dynamically
 - Validate filter combinations before querying
 - Support time range parsing: relative (e.g., `7d`, `30d`) and absolute (ISO 8601 dates or ranges)
+
+Processing flow (high level):
+1. Parse command and flags (identify filters vs options).
+2. Resolve repository (from `--repo` or git remote) and any positional `<url>` (single-issue mode).
+3. Use filters to select the initial set of issues/PRs (server-side where possible).
+4. Apply options to control processing (for example `--depth` and `--cross-repo` for graph traversal).
+5. Produce output using the requested format (`--format`).
+
+Note: when running the `graph` command, filters affect only the initial issue selection (the set of starting issues). The graph traversal/expansion step is controlled by options such as `--depth` and `--cross-repo` and may discover and include additional issues that were not part of the initial filtered set.
 
 ### 5. Fetch Command
 **Purpose**: Fetch list of issues and their basic details
@@ -337,7 +350,7 @@ gh-issue-miner/
 - [x] Comment-level attribution: capture comment id, author, and timestamp for parsed references and include that context on edges
 - [x] Resolve ambiguous short references (`#123`) when possible and surface unresolved/ambiguous short refs as warnings
 - [x] Implement recursive graph resolution with `--depth` and cycle detection; limit cross-repo expansion to avoid explosion
- - [x] Implement rate-limit and performance strategies: batching, exponential backoff, and limits for large repositories
+- [x] Implement rate-limit and performance strategies: batching, exponential backoff, and limits for large repositories
 
 ### Phase 3: Enhanced Filtering & Pulse
 **Goal**: Add comprehensive filtering and filter-aware pulse metrics
