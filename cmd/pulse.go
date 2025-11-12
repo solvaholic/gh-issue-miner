@@ -24,24 +24,44 @@ var pulseCmd = &cobra.Command{
 	Short: "Show metrics about repository issues",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		repo, err := util.DetectRepo(pulseRepo)
+		client, err := api.NewClient()
 		if err != nil {
 			return err
 		}
-		client, err := api.NewRESTClient()
-		if err != nil {
-			return err
+
+		// If a positional arg is provided and it's an issue URL, handle single-issue mode.
+		var issues []api.Issue
+		var repoStr string
+		if len(args) > 0 {
+			if r, num, ok := util.ParseIssueURL(args[0]); ok {
+				// fetched single issue
+				single, err := api.GetIssue(ctx, client, r, num)
+				if err != nil {
+					return err
+				}
+				issues = []api.Issue{single}
+				repoStr = r
+			}
 		}
-		issues, err := api.ListIssues(ctx, client, repo, pulseLimit)
-		if err != nil {
-			return err
+
+		// otherwise behave as before (repo detection + list)
+		if issues == nil {
+			repo, err := util.DetectRepo(pulseRepo)
+			if err != nil {
+				return err
+			}
+			repoStr = repo
+			issues, err = api.ListIssues(ctx, client, repo, pulseLimit)
+			if err != nil {
+				return err
+			}
 		}
 
 		metrics := analyzer.ComputePulse(issues)
 
 		// Use tabwriter for neat alignment
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-		fmt.Fprintf(w, "Repository:\t%s\n\n", repo)
+		fmt.Fprintf(w, "Repository:\t%s\n\n", repoStr)
 
 		// Determine terminal width for title truncation
 		tw, _, err := term.GetSize(int(os.Stdout.Fd()))

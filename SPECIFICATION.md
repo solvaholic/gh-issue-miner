@@ -314,19 +314,15 @@ gh-issue-miner/
 
 **Deliverable**: Users can run `gh issue-miner fetch` and `gh issue-miner pulse` against the current repository or a repository specified with `--repo`, with `--limit` available to bound results.
 
-**Estimated effort**: 2-3 days
-
 ### Phase 2: Graph Command
 **Goal**: Add issue relationship visualization
 
-- [ ] Implement `<url>` filter
+- [x] Implement `<url>` filter
 - [ ] Implement reference parser (regex + timeline API)
 - [ ] Build graph data structure
 - [ ] Implement text-based graph rendering with box-drawing
 - [ ] Add graph command to CLI
 - [ ] Handle cross-repository references
-
-**Estimated effort**: 2-3 days
 
 ### Phase 3: Enhanced Filtering & Pulse
 **Goal**: Add comprehensive filtering and filter-aware pulse metrics
@@ -351,8 +347,6 @@ gh-issue-miner/
 - `gh issue-miner pulse --author octocat --state closed --closed 90d` (issues by octocat closed in last 90 days)
 - `gh issue-miner pulse --assignee alice --label enhancement` (enhancements assigned to alice)
 
-**Estimated effort**: 2-3 days
-
 ### Phase 4: Polish & Distribution
 **Goal**: Production-ready release
 
@@ -362,8 +356,6 @@ gh-issue-miner/
 - [ ] Performance optimization
 - [ ] Create installation instructions
 - [ ] Tag release for `gh extension install`
-
-**Estimated effort**: 1-2 days
 
 ## Installation & Usage
 

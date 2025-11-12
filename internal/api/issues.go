@@ -7,8 +7,6 @@ import (
 	"net/url"
 	"strconv"
 	"time"
-
-	ghapi "github.com/cli/go-gh/v2/pkg/api"
 )
 
 // Issue is a minimal issue representation used for output and analysis.
@@ -25,7 +23,7 @@ type Issue struct {
 }
 
 // ListIssues lists issues for the given repo (owner/repo) up to limit.
-func ListIssues(ctx context.Context, client *ghapi.RESTClient, repo string, limit int) ([]Issue, error) {
+func ListIssues(ctx context.Context, client RESTClient, repo string, limit int) ([]Issue, error) {
 	var result []Issue
 	if limit <= 0 {
 		limit = 100
@@ -123,4 +121,64 @@ func ListIssues(ctx context.Context, client *ghapi.RESTClient, repo string, limi
 		result = result[:limit]
 	}
 	return result, nil
+}
+
+// GetIssue fetches a single issue by number from the given repo (owner/repo).
+func GetIssue(ctx context.Context, client RESTClient, repo string, number int) (Issue, error) {
+	var iss Issue
+	path := fmt.Sprintf("repos/%s/issues/%d", repo, number)
+	var raw interface{}
+	if err := client.Get(path, &raw); err != nil {
+		return iss, err
+	}
+	body, err := json.Marshal(raw)
+	if err != nil {
+		return iss, err
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(body, &m); err != nil {
+		return iss, err
+	}
+	if n, ok := m["number"].(float64); ok {
+		iss.Number = int(n)
+	}
+	if s, ok := m["state"].(string); ok {
+		iss.State = s
+	}
+	if t, ok := m["title"].(string); ok {
+		iss.Title = t
+	}
+	if comments, ok := m["comments"].(float64); ok {
+		iss.Comments = int(comments)
+	}
+	if created, ok := m["created_at"].(string); ok {
+		if tm, err := time.Parse(time.RFC3339, created); err == nil {
+			iss.CreatedAt = tm
+		}
+	}
+	if updated, ok := m["updated_at"].(string); ok {
+		if tm, err := time.Parse(time.RFC3339, updated); err == nil {
+			iss.UpdatedAt = tm
+		}
+	}
+	if closed, ok := m["closed_at"].(string); ok && closed != "" {
+		if tm, err := time.Parse(time.RFC3339, closed); err == nil {
+			iss.ClosedAt = &tm
+		}
+	}
+	if lbls, ok := m["labels"].([]interface{}); ok {
+		for _, l := range lbls {
+			if lm, ok := l.(map[string]interface{}); ok {
+				if name, ok := lm["name"].(string); ok {
+					iss.Labels = append(iss.Labels, name)
+				}
+			}
+		}
+	}
+	if asg, ok := m["assignee"].(map[string]interface{}); ok && asg != nil {
+		if login, ok := asg["login"].(string); ok {
+			iss.Assignee = login
+		}
+	}
+	return iss, nil
 }

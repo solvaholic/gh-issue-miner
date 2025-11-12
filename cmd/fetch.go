@@ -21,19 +21,43 @@ var fetchCmd = &cobra.Command{
 	Short: "Fetch list of issues from a repository",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		repo, err := util.DetectRepo(fetchRepo)
+
+		client, err := api.NewClient()
 		if err != nil {
 			return err
 		}
 
-		client, err := api.NewRESTClient()
-		if err != nil {
-			return err
+		var issues []api.Issue
+		var repoStr string
+
+		// If a positional arg is provided and it's an issue URL, fetch that single issue.
+		if len(args) > 0 {
+			if r, num, ok := util.ParseIssueURL(args[0]); ok {
+				single, err := api.GetIssue(ctx, client, r, num)
+				if err != nil {
+					return err
+				}
+				issues = []api.Issue{single}
+				repoStr = r
+			}
 		}
 
-		issues, err := api.ListIssues(ctx, client, repo, fetchLimit)
-		if err != nil {
-			return err
+		// Otherwise, list issues from detected repo
+		if issues == nil {
+			repo, err := util.DetectRepo(fetchRepo)
+			if err != nil {
+				return err
+			}
+			repoStr = repo
+			issues, err = api.ListIssues(ctx, client, repo, fetchLimit)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Print repo header when available
+		if repoStr != "" {
+			fmt.Fprintf(os.Stdout, "Repository:\t%s\n\n", repoStr)
 		}
 
 		// use tabwriter for aligned columns

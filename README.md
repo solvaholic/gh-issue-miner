@@ -44,13 +44,9 @@ Local development: see `DEVELOPER.md` for local install and testing instructions
 
 Filter   | Default | Description
 ---      | ---     | ---
+<url>    |         | URL of an issue to analyze (all other filters will be ignored)
 --repo   | `origin` remote | NWO or URL of the repository to analyze
 --limit  | 100     | Maximum number of issues to return
-
-<!--
-PHASE 2:
-<url>    |         | URL of an issue to analyze (all other filters will be ignored)
--->
 
 <!--
 PHASE 3:
