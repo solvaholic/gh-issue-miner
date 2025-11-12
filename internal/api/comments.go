@@ -9,6 +9,7 @@ import (
 
 // Comment represents a minimal issue comment.
 type Comment struct {
+	ID        int64
 	Author    string
 	Body      string
 	CreatedAt time.Time
@@ -38,6 +39,9 @@ func ListIssueComments(ctx context.Context, client RESTClient, repo string, numb
 		}
 		for _, it := range items {
 			var c Comment
+			if id, ok := it["id"].(float64); ok {
+				c.ID = int64(id)
+			}
 			if b, ok := it["body"].(string); ok {
 				c.Body = b
 			}

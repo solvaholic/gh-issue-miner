@@ -331,11 +331,11 @@ gh-issue-miner/
 - [x] Populate `Issue.Body` from API responses so textual parsing can run over issue bodies
 - [x] Add `ListIssueComments` helper to fetch issue comments for parsing
 - [x] Add `graph` command (MVP): parse bodies, build adjacency map, print simple adjacency list
- - [x] Graph parses issue bodies and comments (single-issue and list modes)
-- [ ] Add timeline API support and parse timeline items to discover timeline-originated references and explicit actions
-- [ ] Extract and attach full edge metadata: actor (username), timestamp, action type (e.g., "referenced", "closed"), and source (`timeline` vs `parsed` vs `comment`)
-- [ ] Comment-level attribution: capture comment id, author, and timestamp for parsed references and include that context on edges
-- [ ] Resolve ambiguous short references (`#123`) when possible and surface unresolved/ambiguous short refs as warnings
+- [x] Graph parses issue bodies and comments (single-issue and list modes)
+- [x] Add timeline API support and parse timeline items to discover timeline-originated references and explicit actions
+- [x] Extract and attach full edge metadata: actor (username), timestamp, action type (e.g., "referenced", "closed"), and source (`timeline` vs `parsed` vs `comment`)
+- [x] Comment-level attribution: capture comment id, author, and timestamp for parsed references and include that context on edges
+- [x] Resolve ambiguous short references (`#123`) when possible and surface unresolved/ambiguous short refs as warnings
 - [ ] Implement recursive graph resolution with `--depth` and cycle detection; limit cross-repo expansion to avoid explosion
 - [ ] Implement rate-limit and performance strategies: batching, exponential backoff, and limits for large repositories
 

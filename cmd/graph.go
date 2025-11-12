@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -71,7 +72,10 @@ var graphCmd = &cobra.Command{
 			}
 		}
 
-		// Ensure comments are parsed for every issue (list mode and single-issue mode)
+		// Ensure comments are fetched for every issue (list mode and single-issue mode)
+		// We'll store comments per-issue so we can attribute references to comment authors/timestamps.
+		issueComments := make(map[int][]api.Comment)
+		var icMu sync.Mutex
 		// Fetch comments concurrently with a small worker pool to avoid bursting the API
 		sem := make(chan struct{}, 5)
 		var wg sync.WaitGroup
@@ -82,42 +86,160 @@ var graphCmd = &cobra.Command{
 				defer wg.Done()
 				defer func() { <-sem }()
 				it := &issues[idx]
-				// fetch comments for this issue; ignore errors but include any bodies we get
 				comments, _ := api.ListIssueComments(ctx, client, repo, it.Number)
 				if len(comments) > 0 {
-					var sb strings.Builder
-					sb.WriteString(it.Body)
-					for _, c := range comments {
-						sb.WriteString("\n\n")
-						sb.WriteString(c.Body)
-					}
-					it.Body = sb.String()
+					icMu.Lock()
+					issueComments[it.Number] = comments
+					icMu.Unlock()
 				}
 			}(i)
 		}
 		wg.Wait()
 
-		// Build a simple adjacency map by parsing bodies for references
-		adj := map[string][]string{}
+		// Build adjacency with metadata. We'll use timeline events (if available) to annotate edges
+		type Edge struct {
+			Dest      string
+			Actor     string
+			Timestamp time.Time
+			Action    string
+			Source    string // "timeline", "comment", or "body"
+			CommentID int64
+		}
+
+		// adj maps source issue -> map[dedupeKey]Edge to prevent duplicate edges
+		adj := map[string]map[string]Edge{}
+
+		// cache timeline lookups per destination to avoid repeated API calls
+		timelineCache := map[string][]api.TimelineEvent{}
+		var tcMu sync.Mutex
+
+		// helper to get timeline events for a dest (owner/repo and number)
+		getTimeline := func(ownerRepo string, number int) ([]api.TimelineEvent, error) {
+			key := fmt.Sprintf("%s#%d", ownerRepo, number)
+			tcMu.Lock()
+			evs, ok := timelineCache[key]
+			tcMu.Unlock()
+			if ok {
+				return evs, nil
+			}
+			evs, err := api.GetIssueTimeline(ctx, client, ownerRepo, number)
+			if err != nil {
+				return nil, err
+			}
+			tcMu.Lock()
+			timelineCache[key] = evs
+			tcMu.Unlock()
+			return evs, nil
+		}
+
 		for _, it := range issues {
-			key := fmt.Sprintf("%s#%d", repo, it.Number)
-			refs := parser.ParseReferences(it.Body)
-			for _, r := range refs {
-				var dest string
+			// source repository for this issue (short refs resolve to this repo)
+			srcRepo := repo
+			srcKey := fmt.Sprintf("%s#%d", srcRepo, it.Number)
+
+			// parse references in the issue body first
+			bodyRefs := parser.ParseReferences(it.Body)
+			for _, r := range bodyRefs {
+				var destOwner string
 				if r.OwnerRepo != "" {
-					dest = fmt.Sprintf("%s#%d", r.OwnerRepo, r.Number)
+					destOwner = r.OwnerRepo
 				} else {
-					dest = fmt.Sprintf("%s#%d", repo, r.Number)
+					// short refs (#123) resolve to the repository where they are mentioned
+					destOwner = srcRepo
 				}
-				adj[key] = append(adj[key], dest)
+				destKey := fmt.Sprintf("%s#%d", destOwner, r.Number)
+
+				// attempt to annotate via timeline on the destination issue
+				var edge Edge
+				edge.Dest = destKey
+				edge.Source = "body"
+
+				if evs, err := getTimeline(destOwner, r.Number); err == nil {
+					// look for an event where the source issue is this issue
+					for _, ev := range evs {
+						// match by source issue number and owner (owner may be empty if same repo)
+						if ev.SourceIssueNumber == it.Number && (ev.SourceOwnerRepo == "" || ev.SourceOwnerRepo == srcRepo || ev.SourceOwnerRepo == destOwner) {
+							edge.Actor = ev.Actor
+							edge.Timestamp = ev.CreatedAt
+							edge.Action = ev.Type
+							edge.Source = "timeline"
+							break
+						}
+					}
+				}
+
+				// dedupe key uses dest, source, actor, action, timestamp, comment id
+				dk := fmt.Sprintf("%s|%s|%s|%s|%d|%d", edge.Dest, edge.Source, edge.Actor, edge.Action, edge.Timestamp.UnixNano(), edge.CommentID)
+				if _, ok := adj[srcKey]; !ok {
+					adj[srcKey] = map[string]Edge{}
+				}
+				adj[srcKey][dk] = edge
+			}
+
+			// parse references inside each comment and attribute to comment author/time
+			if cms, ok := issueComments[it.Number]; ok {
+				for _, c := range cms {
+					crefs := parser.ParseReferences(c.Body)
+					for _, r := range crefs {
+						var destOwner string
+						if r.OwnerRepo != "" {
+							destOwner = r.OwnerRepo
+						} else {
+							// short refs in comments resolve to the repository where the comment was made
+							destOwner = srcRepo
+						}
+						destKey := fmt.Sprintf("%s#%d", destOwner, r.Number)
+
+						var edge Edge
+						edge.Dest = destKey
+						edge.Source = "comment"
+						edge.Actor = c.Author
+						edge.Timestamp = c.CreatedAt
+						edge.CommentID = c.ID
+
+						// prefer timeline metadata when available
+						if evs, err := getTimeline(destOwner, r.Number); err == nil {
+							for _, ev := range evs {
+								if ev.SourceIssueNumber == it.Number && (ev.SourceOwnerRepo == "" || ev.SourceOwnerRepo == srcRepo || ev.SourceOwnerRepo == destOwner) {
+									edge.Actor = ev.Actor
+									edge.Timestamp = ev.CreatedAt
+									edge.Action = ev.Type
+									edge.Source = "timeline"
+									edge.CommentID = 0
+									break
+								}
+							}
+						}
+
+						dk := fmt.Sprintf("%s|%s|%s|%s|%d|%d", edge.Dest, edge.Source, edge.Actor, edge.Action, edge.Timestamp.UnixNano(), edge.CommentID)
+						if _, ok := adj[srcKey]; !ok {
+							adj[srcKey] = map[string]Edge{}
+						}
+						adj[srcKey][dk] = edge
+					}
+				}
 			}
 		}
 
-		// Print adjacency list
-		for src, dsts := range adj {
+		// Print adjacency list with metadata
+		for src, edges := range adj {
 			fmt.Fprintf(os.Stdout, "%s\n", src)
-			for _, d := range dsts {
-				fmt.Fprintf(os.Stdout, "  -> %s\n", d)
+			for _, e := range edges {
+				var meta []string
+				meta = append(meta, fmt.Sprintf("source=%s", e.Source))
+				if e.Actor != "" {
+					meta = append(meta, fmt.Sprintf("actor=%s", e.Actor))
+				}
+				if !e.Timestamp.IsZero() {
+					meta = append(meta, fmt.Sprintf("at=%s", e.Timestamp.Format(time.RFC3339)))
+				}
+				if e.Action != "" {
+					meta = append(meta, fmt.Sprintf("action=%s", e.Action))
+				}
+				if e.CommentID != 0 {
+					meta = append(meta, fmt.Sprintf("comment_id=%d", e.CommentID))
+				}
+				fmt.Fprintf(os.Stdout, "  -> %s  (%s)\n", e.Dest, strings.Join(meta, ", "))
 			}
 		}
 		return nil
