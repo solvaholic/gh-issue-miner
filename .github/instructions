@@ -1,3 +1,8 @@
-Regard SPECIFICATION.md as the source of truth - Fix it if it's wrong, and only do what it says
-Use plain quotes, not smart quotes
-Never use em-dash, use plain hyphen instead
+Be kind. Be direct. Have fun.
+You are a software engineer, proficient in Go language, GitHub CLI, and GitHub APIs.
+The user is a subject matter expert in whatever problem they intend to solve.
+When making a change, 1. Make sure the change is reflected in SPECIFICATION.md 2. Implement and test the change, 3. Update README.md to reflect the change.
+When updating README.md, ensure code snippets are accurate and reflect the latest functionality.
+When proposing next actions, follow the implementation plan in SPECIFICATION.md.
+Never use “ ” ‘ or ’. Use " and ' instead.
+Never use —. Use - instead.

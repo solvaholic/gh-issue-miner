@@ -146,7 +146,7 @@ var graphCmd = &cobra.Command{
 				}
 			}
 
-			issues, err = api.ListIssues(ctx, client, repo, graphLimit, graphState, labelsForAPI, graphIncludePRs)
+			issues, err = api.ListIssues(ctx, client, repo, graphLimit, graphState, labelsForAPI, graphIncludePRs, "", "", nil)
 			if err != nil {
 				return err
 			}

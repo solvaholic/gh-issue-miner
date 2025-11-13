@@ -264,7 +264,7 @@ Authors:
 **Requirements**:
 - `--output <file>`: Write to file instead of stdout
 - `--sort <field>`: Sort by created, updated, comments (default: created)
-- `--order <dir>`: Sort order asc/desc (default: desc)
+- `--direction <dir>`: Sort direction asc/desc (default: desc). `--order` is accepted as an alias for discoverability.
 - `--format <format>`: Output format (text, json, dot) - default: text
 
 **Technical Approach**:
@@ -358,18 +358,18 @@ gh-issue-miner/
 - [x] Implement `--include-prs` filter
 - [x] Implement `--label` filter
 - [x] Implement `--state` filter
-- [ ] Implement `--assignee` filter
-- [ ] Implement `--author` filter
 - [x] Implement time range parser (relative and absolute dates)
 - [x] Implement `--created` filter (time range)
 - [x] Implement `--updated` filter (time range)
 - [x] Implement `--closed` filter (time range)
 - [x] Update pulse command to respect all filters
 - [x] Add filter summary to pulse output
-- [ ] Add `--sort` and `--order` options
+- [x] Add `--sort` and `--order` options
 - [ ] Add JSON output format
 - [ ] Add DOT output format for graphs
 - [ ] Implement `--output` file option
+- [ ] Implement `--assignee` filter
+- [ ] Implement `--author` filter
 
 **Deliverable**: Users can run filtered pulse queries like:
 - `gh issue-miner pulse --label bug --created 30d` (bugs opened in last 30 days)

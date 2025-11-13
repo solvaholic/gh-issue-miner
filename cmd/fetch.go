@@ -21,6 +21,8 @@ var fetchState string
 var fetchCreated string
 var fetchUpdated string
 var fetchClosed string
+var fetchSort string
+var fetchDirection string
 
 var fetchCmd = &cobra.Command{
 	Use:   "fetch",
@@ -76,13 +78,45 @@ var fetchCmd = &cobra.Command{
 			}
 			repoStr = repo
 
+			// validate sort/direction
+			if fetchSort != "" {
+				switch fetchSort {
+				case "created", "updated", "comments":
+				default:
+					return fmt.Errorf("invalid --sort value: %s (allowed: created, updated, comments)", fetchSort)
+				}
+			}
+			if fetchDirection != "" {
+				d := strings.ToLower(fetchDirection)
+				if d != "asc" && d != "desc" {
+					return fmt.Errorf("invalid --direction/--order value: %s (allowed: asc, desc)", fetchDirection)
+				}
+			}
+
 			// Expand label specs into exact labels for server-side querying
 			labelsForAPI, fallbackRaw, err := ExpandLabelSpecs(ctx, client, repo, fetchLabel)
 			if err != nil {
 				return err
 			}
 
-			issues, err = api.ListIssues(ctx, client, repo, fetchLimit, fetchState, labelsForAPI, fetchIncludePRs)
+			// determine candidate limit to allow client-side filtering without prematurely truncating
+			candidateLimit := fetchLimit
+			if candidateLimit > 0 {
+				// fetch a bit more candidates to account for client-side filtering
+				candidateLimit = candidateLimit * 3
+				const maxCandidates = 2000
+				if candidateLimit > maxCandidates {
+					candidateLimit = maxCandidates
+				}
+			}
+
+			// if updated filter has a start bound, push it to the server via `since`
+			uStart, _, uErr := parseTimeRange(fetchUpdated)
+			if uErr != nil {
+				return uErr
+			}
+
+			issues, err = api.ListIssues(ctx, client, repo, candidateLimit, fetchState, labelsForAPI, fetchIncludePRs, fetchSort, strings.ToLower(fetchDirection), uStart)
 			if err != nil {
 				return err
 			}
@@ -91,6 +125,11 @@ var fetchCmd = &cobra.Command{
 			issues, err = filterIssues(issues, fetchIncludePRs, fetchState, fallbackRaw, fetchCreated, fetchUpdated, fetchClosed)
 			if err != nil {
 				return err
+			}
+
+			// Trim to requested limit after client-side filtering
+			if fetchLimit > 0 && len(issues) > fetchLimit {
+				issues = issues[:fetchLimit]
 			}
 		}
 
@@ -137,4 +176,8 @@ func init() {
 	fetchCmd.Flags().StringVar(&fetchCreated, "created", "", "Filter by created timeframe (e.g., 7d, 2025-01-01, 2025-01-01..2025-01-31)")
 	fetchCmd.Flags().StringVar(&fetchUpdated, "updated", "", "Filter by updated timeframe (e.g., 7d, 2025-01-01)")
 	fetchCmd.Flags().StringVar(&fetchClosed, "closed", "", "Filter by closed timeframe (e.g., 30d, 2025-01-01..2025-02-01)")
+	fetchCmd.Flags().StringVar(&fetchSort, "sort", "", "Sort field: created, updated, comments")
+	fetchCmd.Flags().StringVar(&fetchDirection, "direction", "", "Sort direction: asc or desc")
+	// alias --order to --direction for discoverability (bind to same variable)
+	fetchCmd.Flags().StringVar(&fetchDirection, "order", "", "Alias for --direction")
 }

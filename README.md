@@ -68,8 +68,12 @@ Option       | Default  | Description
 `--max-nodes`  | 500      | Maximum number of nodes to visit during graph traversal (0 = unlimited)
 `--cross-repo` | false    | Allow following references across repositories when recursing (processing option)
 `--format`     | text     | Output format (`text`, `json`, `dot`)
-`--sort`       | created_at | Sort field for output
-`--order`      | desc     | Sort order
+`--sort`       | created  | Sort field (server-side where supported): `created`, `updated`, `comments`
+`--direction`  | desc     | Sort direction (`asc` or `desc`). `--order` is accepted as an alias for discoverability.
+
+Notes on sorting and limits:
+- `--sort` and `--direction` are applied server-side when supported by the API and affect which issues are returned when `--limit` is set. That is, sorting is part of selection: the server orders candidates before the client applies `--limit`.
+- When `--updated` includes a start bound (for example `--updated 60d..`), the start time is pushed to the server via the `since` parameter to reduce transferred results. Upper bounds and other time checks remain enforced client-side until a Search/GraphQL path is implemented.
 
 Important: when running the `graph` command, filters affect only the initial issue selection (the set of starting issues). The graph traversal/expansion step is controlled by options such as `--depth` and `--cross-repo` and may discover and include additional issues that were not part of the initial filtered set.
 
@@ -92,8 +96,15 @@ gh issue-miner fetch --repo owner/repo --created 2025-10-01..2025-10-31
 
 - Fetch issues updated within the last 30 days:
 
+
 ```bash
 gh issue-miner pulse --repo owner/repo --updated 30d
+```
+
+Example: fetch top 10 issues sorted by most comments (server-side sort)
+
+```bash
+gh issue-miner fetch --repo owner/repo --limit 10 --sort comments --direction desc
 ```
 
 - Fetch issues created after a date (open-ended range):

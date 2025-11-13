@@ -92,7 +92,7 @@ var pulseCmd = &cobra.Command{
 				return err
 			}
 
-			issues, err = api.ListIssues(ctx, client, repo, pulseLimit, pulseState, labelsForAPI, pulseIncludePRs)
+			issues, err = api.ListIssues(ctx, client, repo, pulseLimit, pulseState, labelsForAPI, pulseIncludePRs, "", "", nil)
 			if err != nil {
 				return err
 			}

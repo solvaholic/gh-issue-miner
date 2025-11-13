@@ -28,7 +28,7 @@ type Issue struct {
 // ListIssues lists issues for the given repo (owner/repo) up to limit.
 // It accepts optional server-side filters: state (open/closed/all) and labels (exact match list).
 // If includePRs is false, pull requests will be filtered out client-side.
-func ListIssues(ctx context.Context, client RESTClient, repo string, limit int, state string, labels []string, includePRs bool) ([]Issue, error) {
+func ListIssues(ctx context.Context, client RESTClient, repo string, limit int, state string, labels []string, includePRs bool, sort string, direction string, since *time.Time) ([]Issue, error) {
 	var result []Issue
 	if limit <= 0 {
 		limit = 100
@@ -47,6 +47,15 @@ func ListIssues(ctx context.Context, client RESTClient, repo string, limit int, 
 		}
 		if len(labels) > 0 {
 			qs.Set("labels", strings.Join(labels, ","))
+		}
+		if sort != "" {
+			qs.Set("sort", sort)
+		}
+		if direction != "" {
+			qs.Set("direction", direction)
+		}
+		if since != nil {
+			qs.Set("since", since.Format(time.RFC3339))
 		}
 		qs.Set("per_page", strconv.Itoa(perPage))
 		qs.Set("page", strconv.Itoa(page))
