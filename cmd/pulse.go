@@ -25,6 +25,8 @@ var pulseState string
 var pulseCreated string
 var pulseUpdated string
 var pulseClosed string
+var pulseSort string
+var pulseDirection string
 
 var pulseCmd = &cobra.Command{
 	Use:   "pulse",
@@ -86,13 +88,34 @@ var pulseCmd = &cobra.Command{
 			}
 			repoStr = repo
 
+			// validate sort/direction
+			if pulseSort != "" {
+				switch pulseSort {
+				case "created", "updated", "comments":
+				default:
+					return fmt.Errorf("invalid --sort value: %s (allowed: created, updated, comments)", pulseSort)
+				}
+			}
+			if pulseDirection != "" {
+				d := strings.ToLower(pulseDirection)
+				if d != "asc" && d != "desc" {
+					return fmt.Errorf("invalid --direction/--order value: %s (allowed: asc, desc)", pulseDirection)
+				}
+			}
+
 			// Expand label specs into exact labels for server-side querying
 			labelsForAPI, fallbackRaw, err := ExpandLabelSpecs(ctx, client, repo, pulseLabel)
 			if err != nil {
 				return err
 			}
 
-			issues, err = api.ListIssuesFunc(ctx, client, repo, pulseLimit, pulseState, labelsForAPI, pulseIncludePRs, "", "", nil)
+			// If updated filter has a start bound, push it to the server via `since`
+			uStart, _, uErr := parseTimeRange(pulseUpdated)
+			if uErr != nil {
+				return uErr
+			}
+
+			issues, err = api.ListIssuesFunc(ctx, client, repo, pulseLimit, pulseState, labelsForAPI, pulseIncludePRs, pulseSort, strings.ToLower(pulseDirection), uStart)
 			if err != nil {
 				return err
 			}
@@ -234,6 +257,10 @@ func init() {
 	pulseCmd.Flags().StringVar(&pulseCreated, "created", "", "Filter by created timeframe (e.g., 7d, 2025-01-01, 2025-01-01..2025-01-31)")
 	pulseCmd.Flags().StringVar(&pulseUpdated, "updated", "", "Filter by updated timeframe (e.g., 7d, 2025-01-01)")
 	pulseCmd.Flags().StringVar(&pulseClosed, "closed", "", "Filter by closed timeframe (e.g., 30d, 2025-01-01..2025-02-01)")
+	pulseCmd.Flags().StringVar(&pulseSort, "sort", "", "Sort field: created, updated, comments")
+	pulseCmd.Flags().StringVar(&pulseDirection, "direction", "", "Sort direction: asc or desc")
+	// alias --order to --direction for discoverability (bind to same variable)
+	pulseCmd.Flags().StringVar(&pulseDirection, "order", "", "Alias for --direction")
 	rootCmd.AddCommand(pulseCmd)
 }
 

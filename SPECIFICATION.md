@@ -365,7 +365,7 @@ gh-issue-miner/
 - [x] Update pulse command to respect all filters
 - [x] Add filter summary to pulse output
 - [x] Add `--sort` and `--order` options (Fetch only)
-- [ ] Extend `--sort` and `--direction` support to Pulse and Graph commands
+- [x] Extend `--sort` and `--direction` support to Pulse and Graph commands
 - [ ] Add JSON output format
 - [ ] Add DOT output format for graphs
 - [ ] Implement `--output` file option

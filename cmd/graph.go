@@ -26,6 +26,8 @@ var graphState string
 var graphCreated string
 var graphUpdated string
 var graphClosed string
+var graphSort string
+var graphDirection string
 
 var graphCmd = &cobra.Command{
 	Use:   "graph",
@@ -146,7 +148,28 @@ var graphCmd = &cobra.Command{
 				}
 			}
 
-			issues, err = api.ListIssuesFunc(ctx, client, repo, graphLimit, graphState, labelsForAPI, graphIncludePRs, "", "", nil)
+			// validate sort/direction
+			if graphSort != "" {
+				switch graphSort {
+				case "created", "updated", "comments":
+				default:
+					return fmt.Errorf("invalid --sort value: %s (allowed: created, updated, comments)", graphSort)
+				}
+			}
+			if graphDirection != "" {
+				d := strings.ToLower(graphDirection)
+				if d != "asc" && d != "desc" {
+					return fmt.Errorf("invalid --direction/--order value: %s (allowed: asc, desc)", graphDirection)
+				}
+			}
+
+			// If updated filter has a start bound, push it to the server via `since`
+			uStart, _, uErr := parseTimeRange(graphUpdated)
+			if uErr != nil {
+				return uErr
+			}
+
+			issues, err = api.ListIssuesFunc(ctx, client, repo, graphLimit, graphState, labelsForAPI, graphIncludePRs, graphSort, strings.ToLower(graphDirection), uStart)
 			if err != nil {
 				return err
 			}
@@ -488,5 +511,9 @@ func init() {
 	graphCmd.Flags().StringVar(&graphCreated, "created", "", "Filter by created timeframe (e.g., 7d, 2025-01-01, 2025-01-01..2025-01-31)")
 	graphCmd.Flags().StringVar(&graphUpdated, "updated", "", "Filter by updated timeframe (e.g., 7d, 2025-01-01)")
 	graphCmd.Flags().StringVar(&graphClosed, "closed", "", "Filter by closed timeframe (e.g., 30d, 2025-01-01..2025-02-01)")
+	graphCmd.Flags().StringVar(&graphSort, "sort", "", "Sort field: created, updated, comments")
+	graphCmd.Flags().StringVar(&graphDirection, "direction", "", "Sort direction: asc or desc")
+	// alias --order to --direction for discoverability (bind to same variable)
+	graphCmd.Flags().StringVar(&graphDirection, "order", "", "Alias for --direction")
 	rootCmd.AddCommand(graphCmd)
 }
