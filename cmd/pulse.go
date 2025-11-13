@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/solvaholic/gh-issue-miner/internal/analyzer"
 	"github.com/solvaholic/gh-issue-miner/internal/api"
+	"github.com/solvaholic/gh-issue-miner/internal/output"
 	"github.com/solvaholic/gh-issue-miner/internal/util"
 )
 
@@ -129,7 +131,25 @@ var pulseCmd = &cobra.Command{
 
 		metrics := analyzer.ComputePulse(issues)
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+		// prepare output writer (stdout or file)
+		var out io.Writer = os.Stdout
+		var outFile *os.File
+		if outputFile != "" {
+			f, err := os.Create(outputFile)
+			if err != nil {
+				return err
+			}
+			outFile = f
+			out = f
+			defer outFile.Close()
+		}
+
+		// JSON output for pulse
+		if outputFormat == "json" {
+			return output.WritePulseJSON(out, repoStr, metrics)
+		}
+
+		w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 		fmt.Fprintf(w, "Repository:\t%s\n\n", repoStr)
 
 		// Print filter summary when non-default filters were provided

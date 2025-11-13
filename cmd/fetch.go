@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -10,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/solvaholic/gh-issue-miner/internal/api"
+	"github.com/solvaholic/gh-issue-miner/internal/output"
 	"github.com/solvaholic/gh-issue-miner/internal/util"
 )
 
@@ -88,13 +90,31 @@ var fetchCmd = &cobra.Command{
 			}
 		}
 
+		// prepare output writer (stdout or file)
+		var out io.Writer = os.Stdout
+		var outFile *os.File
+		if outputFile != "" {
+			f, err := os.Create(outputFile)
+			if err != nil {
+				return err
+			}
+			outFile = f
+			out = f
+			defer outFile.Close()
+		}
+
+		// JSON output for fetch
+		if outputFormat == "json" {
+			return output.WriteFetchJSON(out, repoStr, issues)
+		}
+
 		// Print repo header when available
 		if repoStr != "" {
-			fmt.Fprintf(os.Stdout, "Repository:\t%s\n\n", repoStr)
+			fmt.Fprintf(out, "Repository:\t%s\n\n", repoStr)
 		}
 
 		// use tabwriter for aligned columns
-		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+		w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 		fmt.Fprintln(w, "#\tstate\ttitle\tlabels\tassignee\tcreated\tupdated\tcomments")
 		for _, it := range issues {
 			labels := strings.Join(it.Labels, ",")

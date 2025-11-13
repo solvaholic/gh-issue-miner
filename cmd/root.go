@@ -7,6 +7,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var outputFormat string
+var outputFile string
+
 var rootCmd = &cobra.Command{
 	Use:   "issue-miner",
 	Short: "Analyze GitHub issues",
@@ -22,6 +25,10 @@ func Execute() {
 }
 
 func init() {
+	// Global output flags (Phase 3)
+	rootCmd.PersistentFlags().StringVar(&outputFormat, "format", "text", "Output format (text, json, dot)")
+	rootCmd.PersistentFlags().StringVar(&outputFile, "output", "", "Output file (default: stdout)")
+
 	// Add subcommands
 	rootCmd.AddCommand(fetchCmd)
 }

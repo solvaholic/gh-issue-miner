@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/solvaholic/gh-issue-miner/internal/api"
+	"github.com/solvaholic/gh-issue-miner/internal/output"
 	"github.com/solvaholic/gh-issue-miner/internal/parser"
 	"github.com/solvaholic/gh-issue-miner/internal/util"
 )
@@ -474,28 +476,73 @@ var graphCmd = &cobra.Command{
 			}
 		}
 
-		// Print adjacency list with metadata
+		// Build a serializable adjacency map
+		type GraphEdge struct {
+			Dest      string    `json:"dest"`
+			Actor     string    `json:"actor,omitempty"`
+			Timestamp time.Time `json:"timestamp,omitempty"`
+			Action    string    `json:"action,omitempty"`
+			Source    string    `json:"source"`
+			CommentID int64     `json:"comment_id,omitempty"`
+		}
+
+		graphOut := map[string][]GraphEdge{}
 		for src, edges := range adj {
-			fmt.Fprintf(os.Stdout, "%s\n", src)
 			for _, e := range edges {
-				var meta []string
-				meta = append(meta, fmt.Sprintf("source=%s", e.Source))
-				if e.Actor != "" {
-					meta = append(meta, fmt.Sprintf("actor=%s", e.Actor))
+				ge := GraphEdge{
+					Dest:      e.Dest,
+					Actor:     e.Actor,
+					Timestamp: e.Timestamp,
+					Action:    e.Action,
+					Source:    e.Source,
+					CommentID: e.CommentID,
 				}
-				if !e.Timestamp.IsZero() {
-					meta = append(meta, fmt.Sprintf("at=%s", e.Timestamp.Format(time.RFC3339)))
-				}
-				if e.Action != "" {
-					meta = append(meta, fmt.Sprintf("action=%s", e.Action))
-				}
-				if e.CommentID != 0 {
-					meta = append(meta, fmt.Sprintf("comment_id=%d", e.CommentID))
-				}
-				fmt.Fprintf(os.Stdout, "  -> %s  (%s)\n", e.Dest, strings.Join(meta, ", "))
+				graphOut[src] = append(graphOut[src], ge)
 			}
 		}
-		return nil
+
+		// prepare output writer
+		var out io.Writer = os.Stdout
+		var outFile *os.File
+		if outputFile != "" {
+			f, err := os.Create(outputFile)
+			if err != nil {
+				return err
+			}
+			outFile = f
+			out = f
+			defer outFile.Close()
+		}
+
+		switch outputFormat {
+		case "json":
+			return output.WriteGraphJSON(out, graphOut)
+		case "dot":
+			return output.WriteGraphDOT(out, graphOut)
+		default:
+			// text output: fall back to previous printing style but to chosen writer
+			for src, edges := range adj {
+				fmt.Fprintf(out, "%s\n", src)
+				for _, e := range edges {
+					var meta []string
+					meta = append(meta, fmt.Sprintf("source=%s", e.Source))
+					if e.Actor != "" {
+						meta = append(meta, fmt.Sprintf("actor=%s", e.Actor))
+					}
+					if !e.Timestamp.IsZero() {
+						meta = append(meta, fmt.Sprintf("at=%s", e.Timestamp.Format(time.RFC3339)))
+					}
+					if e.Action != "" {
+						meta = append(meta, fmt.Sprintf("action=%s", e.Action))
+					}
+					if e.CommentID != 0 {
+						meta = append(meta, fmt.Sprintf("comment_id=%d", e.CommentID))
+					}
+					fmt.Fprintf(out, "  -> %s  (%s)\n", e.Dest, strings.Join(meta, ", "))
+				}
+			}
+			return nil
+		}
 	},
 }
 
