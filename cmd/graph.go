@@ -25,6 +25,8 @@ var graphMaxNodes int
 var graphIncludePRs bool
 var graphLabel string
 var graphState string
+var graphAssignee string
+var graphAuthor string
 var graphCreated string
 var graphUpdated string
 var graphClosed string
@@ -171,7 +173,7 @@ var graphCmd = &cobra.Command{
 				return uErr
 			}
 
-			issues, err = api.ListIssuesFunc(ctx, client, repo, graphLimit, graphState, labelsForAPI, graphIncludePRs, graphSort, strings.ToLower(graphDirection), uStart)
+			issues, err = api.ListIssuesFunc(ctx, client, repo, graphLimit, graphState, labelsForAPI, graphIncludePRs, graphAssignee, graphAuthor, graphSort, strings.ToLower(graphDirection), uStart)
 			if err != nil {
 				return err
 			}
@@ -555,6 +557,8 @@ func init() {
 	graphCmd.Flags().BoolVar(&graphIncludePRs, "include-prs", false, "Include pull requests in the initial issue selection")
 	graphCmd.Flags().StringVar(&graphLabel, "label", "", "Comma-separated label specs (exact or prefix*). Matches issues containing any of these labels")
 	graphCmd.Flags().StringVar(&graphState, "state", "", "Filter by issue state: open, closed")
+	graphCmd.Flags().StringVar(&graphAssignee, "assignee", "", "Filter by assignee username")
+	graphCmd.Flags().StringVar(&graphAuthor, "author", "", "Filter by issue author username")
 	graphCmd.Flags().StringVar(&graphCreated, "created", "", "Filter by created timeframe (e.g., 7d, 2025-01-01, 2025-01-01..2025-01-31)")
 	graphCmd.Flags().StringVar(&graphUpdated, "updated", "", "Filter by updated timeframe (e.g., 7d, 2025-01-01)")
 	graphCmd.Flags().StringVar(&graphClosed, "closed", "", "Filter by closed timeframe (e.g., 30d, 2025-01-01..2025-02-01)")

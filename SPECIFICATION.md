@@ -371,8 +371,8 @@ gh-issue-miner/
 - [x] Add JSON output format
 - [x] Add DOT output format for graphs
 - [x] Implement `--output` file option
-- [ ] Implement `--assignee` filter
-- [ ] Implement `--author` filter
+- [x] Implement `--assignee` filter
+- [x] Implement `--author` filter
 - [ ] Search/GraphQL redesign for full server-side ranges
 
 **Deliverable**: Users can run filtered pulse queries like:

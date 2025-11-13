@@ -59,6 +59,8 @@ Filter   | Default | Description
 `--created`   |  | Issues created within this time frame<br />(e.g., `30d`, `90d..60d`, `2025-02-01..`)
 `--updated`   |  | Issues updated within this time frame<br />(e.g., `30d`, `90d..60d`, `2025-02-01..`)
 `--closed`    |  | Issues closed within this time frame<br />(e.g., `30d`, `90d..60d`, `2025-02-01..`)
+`--assignee`  | all | Issues assigned to this user
+`--author`    | all | Issues created by this author
 
 Options that change processing or output (not selection):
 

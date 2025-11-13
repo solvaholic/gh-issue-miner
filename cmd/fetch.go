@@ -20,6 +20,8 @@ var fetchLimit int
 var fetchIncludePRs bool
 var fetchLabel string
 var fetchState string
+var fetchAssignee string
+var fetchAuthor string
 var fetchCreated string
 var fetchUpdated string
 var fetchClosed string
@@ -84,7 +86,7 @@ var fetchCmd = &cobra.Command{
 		// Otherwise, list issues from detected repo
 		if issues == nil {
 			var err error
-			issues, repoStr, err = FetchIssues(ctx, client, fetchRepo, fetchLimit, fetchIncludePRs, fetchLabel, fetchState, fetchCreated, fetchUpdated, fetchClosed, fetchSort, fetchDirection)
+			issues, repoStr, err = FetchIssues(ctx, client, fetchRepo, fetchLimit, fetchIncludePRs, fetchLabel, fetchState, fetchAssignee, fetchAuthor, fetchCreated, fetchUpdated, fetchClosed, fetchSort, fetchDirection)
 			if err != nil {
 				return err
 			}
@@ -148,6 +150,8 @@ func init() {
 	fetchCmd.Flags().BoolVar(&fetchIncludePRs, "include-prs", false, "Include pull requests in results")
 	fetchCmd.Flags().StringVar(&fetchLabel, "label", "", "Comma-separated label specs (exact or prefix*). Matches issues containing any of these labels")
 	fetchCmd.Flags().StringVar(&fetchState, "state", "", "Filter by issue state: open, closed")
+	fetchCmd.Flags().StringVar(&fetchAssignee, "assignee", "", "Filter by assignee username")
+	fetchCmd.Flags().StringVar(&fetchAuthor, "author", "", "Filter by issue author username")
 	fetchCmd.Flags().StringVar(&fetchCreated, "created", "", "Filter by created timeframe (e.g., 7d, 2025-01-01, 2025-01-01..2025-01-31)")
 	fetchCmd.Flags().StringVar(&fetchUpdated, "updated", "", "Filter by updated timeframe (e.g., 7d, 2025-01-01)")
 	fetchCmd.Flags().StringVar(&fetchClosed, "closed", "", "Filter by closed timeframe (e.g., 30d, 2025-01-01..2025-02-01)")
@@ -158,7 +162,7 @@ func init() {
 }
 
 // FetchIssues performs the core fetch logic and is exported for testing.
-func FetchIssues(ctx context.Context, client api.RESTClient, repoArg string, limit int, includePRs bool, label string, state string, created string, updated string, closed string, sort string, direction string) ([]api.Issue, string, error) {
+func FetchIssues(ctx context.Context, client api.RESTClient, repoArg string, limit int, includePRs bool, label string, state string, assignee string, author string, created string, updated string, closed string, sort string, direction string) ([]api.Issue, string, error) {
 	// validate sort/direction
 	if sort != "" {
 		switch sort {
@@ -202,7 +206,7 @@ func FetchIssues(ctx context.Context, client api.RESTClient, repoArg string, lim
 		return nil, "", uErr
 	}
 
-	issues, err := api.ListIssuesFunc(ctx, client, repo, candidateLimit, state, labelsForAPI, includePRs, sort, strings.ToLower(direction), uStart)
+	issues, err := api.ListIssuesFunc(ctx, client, repo, candidateLimit, state, labelsForAPI, includePRs, assignee, author, sort, strings.ToLower(direction), uStart)
 	if err != nil {
 		return nil, "", err
 	}

@@ -24,6 +24,8 @@ var pulseLimit int
 var pulseIncludePRs bool
 var pulseLabel string
 var pulseState string
+var pulseAssignee string
+var pulseAuthor string
 var pulseCreated string
 var pulseUpdated string
 var pulseClosed string
@@ -117,7 +119,7 @@ var pulseCmd = &cobra.Command{
 				return uErr
 			}
 
-			issues, err = api.ListIssuesFunc(ctx, client, repo, pulseLimit, pulseState, labelsForAPI, pulseIncludePRs, pulseSort, strings.ToLower(pulseDirection), uStart)
+			issues, err = api.ListIssuesFunc(ctx, client, repo, pulseLimit, pulseState, labelsForAPI, pulseIncludePRs, pulseAssignee, pulseAuthor, pulseSort, strings.ToLower(pulseDirection), uStart)
 			if err != nil {
 				return err
 			}
@@ -274,6 +276,8 @@ func init() {
 	pulseCmd.Flags().BoolVar(&pulseIncludePRs, "include-prs", false, "Include pull requests in results")
 	pulseCmd.Flags().StringVar(&pulseLabel, "label", "", "Comma-separated label specs (exact or prefix*). Matches issues containing any of these labels")
 	pulseCmd.Flags().StringVar(&pulseState, "state", "", "Filter by issue state: open, closed")
+	pulseCmd.Flags().StringVar(&pulseAssignee, "assignee", "", "Filter by assignee username")
+	pulseCmd.Flags().StringVar(&pulseAuthor, "author", "", "Filter by issue author username")
 	pulseCmd.Flags().StringVar(&pulseCreated, "created", "", "Filter by created timeframe (e.g., 7d, 2025-01-01, 2025-01-01..2025-01-31)")
 	pulseCmd.Flags().StringVar(&pulseUpdated, "updated", "", "Filter by updated timeframe (e.g., 7d, 2025-01-01)")
 	pulseCmd.Flags().StringVar(&pulseClosed, "closed", "", "Filter by closed timeframe (e.g., 30d, 2025-01-01..2025-02-01)")
