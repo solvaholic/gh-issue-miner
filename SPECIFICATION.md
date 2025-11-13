@@ -107,6 +107,8 @@ Processing flow (high level):
 
 Note: when running the `graph` command, filters affect only the initial issue selection (the set of starting issues). The graph traversal/expansion step is controlled by options such as `--depth` and `--cross-repo` and may discover and include additional issues that were not part of the initial filtered set.
 
+Implementation notes and trade-offs that affect filtering semantics, server vs client pushdown, and test seams are recorded in `DESIGN.md`.
+
 ### 5. Fetch Command
 **Purpose**: Fetch list of issues and their basic details
 

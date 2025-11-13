@@ -75,6 +75,14 @@ Notes on sorting and limits:
 - `--sort` and `--direction` are applied server-side when supported by the API and affect which issues are returned when `--limit` is set. That is, sorting is part of selection: the server orders candidates before the client applies `--limit`.
 - When `--updated` includes a start bound (for example `--updated 60d..`), the start time is pushed to the server via the `since` parameter to reduce transferred results. Upper bounds and other time checks remain enforced client-side until a Search/GraphQL path is implemented.
 
+Behavior notes (short):
+
+- **Labels:** server-side label filters use GitHub REST `labels=` which is an AND across labels (issues must contain all provided labels). Trailing `*` patterns are expanded by listing repository labels; exact matches produced by expansion are pushed server-side while unmatched prefixes are applied client-side. See `DESIGN.md` for rationale.
+- **Time ranges:** when `--updated` includes a left/start bound we push it as `since` to reduce transferred results; end bounds (upper limits) remain enforced locally.
+- **Limits & candidates:** to honor `--limit` after local filtering (wildcards, time upper-bounds), the CLI fetches extra candidates (default 3×, capped) and applies client-side filters before trimming to `--limit`. Heavily filtered queries may therefore use more API calls.
+
+See `DESIGN.md` for more implementation notes and trade-offs that affect filtering semantics.
+
 Important: when running the `graph` command, filters affect only the initial issue selection (the set of starting issues). The graph traversal/expansion step is controlled by options such as `--depth` and `--cross-repo` and may discover and include additional issues that were not part of the initial filtered set.
 
 ## Examples: Time-based filters

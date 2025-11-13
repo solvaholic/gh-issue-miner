@@ -44,6 +44,31 @@ Testing
 - Unit tests: `go test ./...`
 - Run the CLI directly (without install): `go run . fetch --repo owner/repo --limit 10`
 
+Testing hooks & mocking
+-----------------------
+The codebase exposes small test seams to make unit tests deterministic and to avoid calling the real GitHub API in unit tests.
+
+- `internal/api.ListIssuesFunc` is a package-level variable referencing the real listing function. Tests can override it to return fake data and then restore the original function. Example:
+
+```go
+// save original and restore in defer
+orig := api.ListIssuesFunc
+defer func() { api.ListIssuesFunc = orig }()
+
+api.ListIssuesFunc = func(ctx context.Context, client api.RESTClient, repo string, limit int, state string, labels []string, includePRs bool, sort string, direction string, since *time.Time) ([]api.Issue, error) {
+	// return deterministic fixture data for tests
+	return []api.Issue{{Number: 1, Title: "mock"}}, nil
+}
+
+// call cmd.FetchIssues to exercise client-side filtering logic
+issues, repoStr, err := FetchIssues(context.Background(), nil, "owner/repo", 10, false, "", "", "", "", "", "")
+_ = issues
+_ = repoStr
+_ = err
+```
+
+- Use `cmd.FetchIssues` in tests to get deterministic behavior for the list + client-side filtering path. Pass an explicit `repo` argument to avoid repo detection and keep tests isolated.
+
 Uninstalling
 ------------
 Remove the locally installed extension:
