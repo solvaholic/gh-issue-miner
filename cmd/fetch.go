@@ -57,6 +57,15 @@ var fetchCmd = &cobra.Command{
 				if cmd.Flags().Changed("limit") {
 					conflict = append(conflict, "--limit")
 				}
+				if cmd.Flags().Changed("created") {
+					conflict = append(conflict, "--created")
+				}
+				if cmd.Flags().Changed("updated") {
+					conflict = append(conflict, "--updated")
+				}
+				if cmd.Flags().Changed("closed") {
+					conflict = append(conflict, "--closed")
+				}
 				if len(conflict) > 0 {
 					return fmt.Errorf("positional issue URL cannot be combined with filters: %s", strings.Join(conflict, ", "))
 				}
@@ -72,64 +81,10 @@ var fetchCmd = &cobra.Command{
 
 		// Otherwise, list issues from detected repo
 		if issues == nil {
-			repo, err := util.DetectRepo(fetchRepo)
+			var err error
+			issues, repoStr, err = FetchIssues(ctx, client, fetchRepo, fetchLimit, fetchIncludePRs, fetchLabel, fetchState, fetchCreated, fetchUpdated, fetchClosed, fetchSort, fetchDirection)
 			if err != nil {
 				return err
-			}
-			repoStr = repo
-
-			// validate sort/direction
-			if fetchSort != "" {
-				switch fetchSort {
-				case "created", "updated", "comments":
-				default:
-					return fmt.Errorf("invalid --sort value: %s (allowed: created, updated, comments)", fetchSort)
-				}
-			}
-			if fetchDirection != "" {
-				d := strings.ToLower(fetchDirection)
-				if d != "asc" && d != "desc" {
-					return fmt.Errorf("invalid --direction/--order value: %s (allowed: asc, desc)", fetchDirection)
-				}
-			}
-
-			// Expand label specs into exact labels for server-side querying
-			labelsForAPI, fallbackRaw, err := ExpandLabelSpecs(ctx, client, repo, fetchLabel)
-			if err != nil {
-				return err
-			}
-
-			// determine candidate limit to allow client-side filtering without prematurely truncating
-			candidateLimit := fetchLimit
-			if candidateLimit > 0 {
-				// fetch a bit more candidates to account for client-side filtering
-				candidateLimit = candidateLimit * 3
-				const maxCandidates = 2000
-				if candidateLimit > maxCandidates {
-					candidateLimit = maxCandidates
-				}
-			}
-
-			// if updated filter has a start bound, push it to the server via `since`
-			uStart, _, uErr := parseTimeRange(fetchUpdated)
-			if uErr != nil {
-				return uErr
-			}
-
-			issues, err = api.ListIssues(ctx, client, repo, candidateLimit, fetchState, labelsForAPI, fetchIncludePRs, fetchSort, strings.ToLower(fetchDirection), uStart)
-			if err != nil {
-				return err
-			}
-
-			// Apply client-side filters only for any unmatched wildcard prefixes
-			issues, err = filterIssues(issues, fetchIncludePRs, fetchState, fallbackRaw, fetchCreated, fetchUpdated, fetchClosed)
-			if err != nil {
-				return err
-			}
-
-			// Trim to requested limit after client-side filtering
-			if fetchLimit > 0 && len(issues) > fetchLimit {
-				issues = issues[:fetchLimit]
 			}
 		}
 
@@ -180,4 +135,68 @@ func init() {
 	fetchCmd.Flags().StringVar(&fetchDirection, "direction", "", "Sort direction: asc or desc")
 	// alias --order to --direction for discoverability (bind to same variable)
 	fetchCmd.Flags().StringVar(&fetchDirection, "order", "", "Alias for --direction")
+}
+
+// FetchIssues performs the core fetch logic and is exported for testing.
+func FetchIssues(ctx context.Context, client api.RESTClient, repoArg string, limit int, includePRs bool, label string, state string, created string, updated string, closed string, sort string, direction string) ([]api.Issue, string, error) {
+	// validate sort/direction
+	if sort != "" {
+		switch sort {
+		case "created", "updated", "comments":
+		default:
+			return nil, "", fmt.Errorf("invalid --sort value: %s (allowed: created, updated, comments)", sort)
+		}
+	}
+	if direction != "" {
+		d := strings.ToLower(direction)
+		if d != "asc" && d != "desc" {
+			return nil, "", fmt.Errorf("invalid --direction/--order value: %s (allowed: asc, desc)", direction)
+		}
+	}
+
+	repo, err := util.DetectRepo(repoArg)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Expand label specs into exact labels for server-side querying
+	labelsForAPI, fallbackRaw, err := ExpandLabelSpecs(ctx, client, repo, label)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// determine candidate limit to allow client-side filtering without prematurely truncating
+	candidateLimit := limit
+	if candidateLimit > 0 {
+		// fetch a bit more candidates to account for client-side filtering
+		candidateLimit = candidateLimit * 3
+		const maxCandidates = 2000
+		if candidateLimit > maxCandidates {
+			candidateLimit = maxCandidates
+		}
+	}
+
+	// if updated filter has a start bound, push it to the server via `since`
+	uStart, _, uErr := parseTimeRange(updated)
+	if uErr != nil {
+		return nil, "", uErr
+	}
+
+	issues, err := api.ListIssuesFunc(ctx, client, repo, candidateLimit, state, labelsForAPI, includePRs, sort, strings.ToLower(direction), uStart)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Apply client-side filters only for any unmatched wildcard prefixes
+	issues, err = filterIssues(issues, includePRs, state, fallbackRaw, created, updated, closed)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Trim to requested limit after client-side filtering
+	if limit > 0 && len(issues) > limit {
+		issues = issues[:limit]
+	}
+
+	return issues, repo, nil
 }

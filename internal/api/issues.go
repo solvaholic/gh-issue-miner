@@ -222,3 +222,7 @@ func GetIssue(ctx context.Context, client RESTClient, repo string, number int) (
 
 	return iss, nil
 }
+
+// ListIssuesFunc is a package-level variable pointing to the ListIssues implementation.
+// Tests can replace this with a mock function to exercise higher-level calling code.
+var ListIssuesFunc = ListIssues

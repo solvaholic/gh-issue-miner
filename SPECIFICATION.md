@@ -364,12 +364,14 @@ gh-issue-miner/
 - [x] Implement `--closed` filter (time range)
 - [x] Update pulse command to respect all filters
 - [x] Add filter summary to pulse output
-- [x] Add `--sort` and `--order` options
+- [x] Add `--sort` and `--order` options (Fetch only)
+- [ ] Extend `--sort` and `--direction` support to Pulse and Graph commands
 - [ ] Add JSON output format
 - [ ] Add DOT output format for graphs
 - [ ] Implement `--output` file option
 - [ ] Implement `--assignee` filter
 - [ ] Implement `--author` filter
+- [ ] Search/GraphQL redesign for full server-side ranges
 
 **Deliverable**: Users can run filtered pulse queries like:
 - `gh issue-miner pulse --label bug --created 30d` (bugs opened in last 30 days)
